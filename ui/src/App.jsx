@@ -1,12 +1,14 @@
 import { useState } from "react"
 import Rule from "./Rule"
 import convertToFlagdFormat from "./convertToFlagdFormat"
-import convertFromFlagdFormat from "./convertFromFlagdFormat"
 import validateFlagdSchema from "./validateFlagdSchema"
 import "./App.css"
 
+const API_BASE_URL = "http://localhost:9090"
+
 function App() {
   const [flagKey, setFlagKey] = useState("test-feature")
+  const [description, setDescription] = useState("")
   const [state, setState] = useState(true)
   const [type, setType] = useState("boolean")
   const [variants, setVariants] = useState([
@@ -23,10 +25,6 @@ function App() {
   const [hasDefaultRule, setHasDefaultRule] = useState(false)
   const [defaultRule, setDefaultRule] = useState("false")
 
-  // Import/Export state
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [importText, setImportText] = useState("")
-  const [importError, setImportError] = useState("")
   const [validationResult, setValidationResult] = useState(null)
 
   const handleTypeChange = (newType) => {
@@ -134,36 +132,6 @@ function App() {
     return JSON.stringify(convertedJson, null, 2)
   }
 
-  const handleImport = () => {
-    setImportError("")
-    try {
-      const parsed = JSON.parse(importText)
-      const result = convertFromFlagdFormat(parsed)
-
-      if (!result) {
-        setImportError("Invalid flagd format: Could not parse the definition")
-        return
-      }
-
-      // Apply imported values to state
-      setFlagKey(result.flagKey)
-      setState(result.state)
-      setType(result.type)
-      setVariants(result.variants)
-      setDefaultVariant(result.defaultVariant)
-      setHasTargeting(result.hasTargeting)
-      setRules(result.rules)
-      setHasDefaultRule(result.hasDefaultRule)
-      setDefaultRule(result.defaultRule)
-
-      // Close modal and clear import text
-      setShowImportModal(false)
-      setImportText("")
-    } catch (e) {
-      setImportError(`JSON parse error: ${e.message}`)
-    }
-  }
-
   const handleValidate = () => {
     try {
       const json = JSON.parse(generateJSON())
@@ -174,17 +142,49 @@ function App() {
     }
   }
 
-  const handleExport = () => {
-    const json = generateJSON()
-    const blob = new Blob([json], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${flagKey || "flag"}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  const handleSave = async () => {
+    const sourceId = "2979bd38-fa60-4e3d-8e52-b363cdc80082"
+    const flagId = flagKey
+    
+    const flagdJson = JSON.parse(generateJSON())
+    const flagData = flagdJson[flagKey]
+    
+    let targeting = null
+    if (hasTargeting && flagData.targeting) {
+      targeting = {
+        targetingKey: {},
+        rule: JSON.stringify(flagData.targeting)
+      }
+    }
+    
+    const requestBody = {
+      name: flagKey,
+      description: description || null,
+      state: flagData.state,
+      defaultVariant: flagData.defaultVariant || null,
+      variants: flagData.variants || null,
+      targeting: targeting
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${flagId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody)
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! status: ${response.status}, ${errorText}`)
+      }
+      
+      console.log("Flag saved successfully")
+    } catch (error) {
+      console.error("Error saving flag:", error)
+      alert("Error saving flag: " + error.message)
+    }
   }
 
   const getBooleanVariantBlock = (variant, index) => ( type === "boolean" ?
@@ -250,32 +250,6 @@ function App() {
     </label>
   )
 
-  const importModal = showImportModal && (
-    <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Import flagd Definition</h2>
-          <button className="modal-close" onClick={() => setShowImportModal(false)}>&times;</button>
-        </div>
-        <div className="modal-body">
-          <p className="modal-description">Paste your flagd JSON definition below:</p>
-          <textarea
-            className="import-textarea"
-            value={importText}
-            onChange={(e) => setImportText(e.target.value)}
-            placeholder='{"my-flag": {"state": "ENABLED", "variants": {...}}}'
-            rows={12}
-          />
-          {importError && <div className="error-message">{importError}</div>}
-        </div>
-        <div className="modal-footer">
-          <button className="button button-secondary" onClick={() => setShowImportModal(false)}>Cancel</button>
-          <button className="button button-primary" onClick={handleImport}>Import</button>
-        </div>
-      </div>
-    </div>
-  )
-
   const validationBlock = validationResult && (
     <div className={`validation-result ${validationResult.valid ? 'validation-success' : 'validation-error'}`}>
       <div className="validation-header">
@@ -294,12 +268,9 @@ function App() {
 
   return (
     <div className="app-container">
-      {importModal}
       <header className="app-header">
         <h1>flagd ui</h1>
-        <div className="header-actions">
-          <button className="button button-secondary" onClick={() => setShowImportModal(true)}>Import</button>
-        </div>
+        <div className="header-actions"></div>
       </header>
       <div className="app-layout">
         <div className="form-panel">
@@ -309,6 +280,11 @@ function App() {
               <label htmlFor="flagKey" className="form-label">Flag Key</label>
               <input id="flagKey" className="input" value={flagKey}
                 onChange={(e) => setFlagKey(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label htmlFor="description" className="form-label">Description</label>
+              <input id="description" className="input" value={description}
+                onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="checkbox-wrapper">
@@ -375,7 +351,7 @@ function App() {
             <span className="json-panel-title">Output</span>
             <div className="json-panel-actions">
               <button className="button button-secondary" onClick={handleValidate}>Validate</button>
-              <button className="button button-primary" onClick={handleExport}>Export</button>
+              <button className="button button-primary" onClick={handleSave}>Save</button>
             </div>
           </div>
           {validationBlock}

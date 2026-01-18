@@ -115,7 +115,7 @@ class SourcesControllerTest {
     void shouldGetFlags() throws Exception {
         // Given
         List<FlagDTO> flags = List.of(
-            new FlagDTO("test-flag", "Test Flag", "A test flag", "ENABLED", "on", Map.of("on", true, "off", false))
+            new FlagDTO("test-flag", "Test Flag", "A test flag", "ENABLED", "on", Map.of("on", true, "off", false), null)
         );
         when(flagService.getFlags(new SourceId(testSourceId))).thenReturn(flags);
 
@@ -137,7 +137,8 @@ class SourcesControllerTest {
                 "Updated Description",
                 "ENABLED",
                 "on",
-                Map.of("on", true, "off", false)
+                Map.of("on", true, "off", false),
+                null
         );
         
         doNothing().when(flagService).addOrUpdateFlag(eq(new SourceId(testSourceId)), eq("test-flag"), any(FlagConfigRequestDTO.class));
