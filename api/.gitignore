@@ -24,6 +24,9 @@ gradle-app.setting
 *.war
 *.ear
 
+# Avoid updating app.db
+/src/main/resources/app.db
+
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
 
