@@ -26,6 +26,7 @@ function App() {
   const [defaultRule, setDefaultRule] = useState("false")
 
   const [validationResult, setValidationResult] = useState(null)
+  const [saveResult, setSaveResult] = useState(null)
 
   const handleTypeChange = (newType) => {
     setType(newType)
@@ -180,10 +181,10 @@ function App() {
         throw new Error(`HTTP error! status: ${response.status}, ${errorText}`)
       }
       
-      console.log("Flag saved successfully")
+      setSaveResult({ success: true, message: "Flag saved successfully" })
     } catch (error) {
       console.error("Error saving flag:", error)
-      alert("Error saving flag: " + error.message)
+      setSaveResult({ success: false, message: "Error saving flag: " + error.message })
     }
   }
 
@@ -263,6 +264,18 @@ function App() {
         </ul>
       )}
       <button className="validation-dismiss" onClick={() => setValidationResult(null)}>&times;</button>
+    </div>
+  )
+
+  const saveResultBlock = saveResult && (
+    <div className={`validation-result ${saveResult.success ? 'validation-success' : 'validation-error'}`}>
+      <div className="validation-header">
+        {saveResult.success ? 'Success' : 'Error'}
+      </div>
+      <div className="validation-errors">
+        {saveResult.message}
+      </div>
+      <button className="validation-dismiss" onClick={() => setSaveResult(null)}>&times;</button>
     </div>
   )
 
@@ -355,6 +368,7 @@ function App() {
             </div>
           </div>
           {validationBlock}
+          {saveResultBlock}
           <textarea id="json" className="json-textarea" readOnly value={generateJSON()} rows={30} />
         </div>
       </div>

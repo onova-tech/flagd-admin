@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tech.onova.flagd_admin_server.controller.DTOs.FlagConfigRequestDTO;
 import tech.onova.flagd_admin_server.controller.DTOs.FlagDTO;
-import tech.onova.flagd_admin_server.controller.DTOs.TargetingDTO;
 import tech.onova.flagd_admin_server.domain.entity.Source;
 import tech.onova.flagd_admin_server.domain.entity.SourceId;
 import tech.onova.flagd_admin_server.domain.entity.SourceUri;
@@ -141,14 +140,7 @@ public class FlagServiceImpl implements FlagService {
                 flagNode.putPOJO("variants", request.variants());
             }
             if (request.targeting() != null) {
-                ObjectNode targetingNode = objectMapper.createObjectNode();
-                if (request.targeting().targetingKey() != null && !request.targeting().targetingKey().isEmpty()) {
-                    targetingNode.putPOJO("targetingKey", request.targeting().targetingKey());
-                }
-                if (request.targeting().rule() != null && !request.targeting().rule().isBlank()) {
-                    targetingNode.put("rule", request.targeting().rule());
-                }
-                flagNode.set("targeting", targetingNode);
+                flagNode.putPOJO("targeting", request.targeting());
             }
             
             flagsNode.set(flagId, flagNode);
@@ -201,18 +193,9 @@ public class FlagServiceImpl implements FlagService {
                 variants = objectMapper.convertValue(flagNode.get("variants"), Map.class);
             }
             
-            TargetingDTO targeting = null;
-            if (flagNode.has("targeting") && flagNode.get("targeting").isObject()) {
-                JsonNode targetingNode = flagNode.get("targeting");
-                Map<String, String> targetingKey = null;
-                String rule = null;
-                if (targetingNode.has("targetingKey") && targetingNode.get("targetingKey").isObject()) {
-                    targetingKey = objectMapper.convertValue(targetingNode.get("targetingKey"), Map.class);
-                }
-                if (targetingNode.has("rule")) {
-                    rule = targetingNode.get("rule").asText();
-                }
-                targeting = new TargetingDTO(targetingKey, rule);
+            Object targeting = null;
+            if (flagNode.has("targeting")) {
+                targeting = objectMapper.convertValue(flagNode.get("targeting"), Object.class);
             }
             
             if (key == null) {

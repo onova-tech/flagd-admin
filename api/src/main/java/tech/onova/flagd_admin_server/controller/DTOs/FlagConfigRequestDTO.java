@@ -16,6 +16,6 @@ public record FlagConfigRequestDTO(
         
         Map<String, Object> variants,
         
-        TargetingDTO targeting
+        Object targeting
 ) {
 }

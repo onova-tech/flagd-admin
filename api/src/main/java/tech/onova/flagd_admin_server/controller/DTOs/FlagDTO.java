@@ -9,6 +9,6 @@ public record FlagDTO(
         String state,
         String defaultVariant,
         Map<String, Object> variants,
-        TargetingDTO targeting
+        Object targeting
 ) {
 }

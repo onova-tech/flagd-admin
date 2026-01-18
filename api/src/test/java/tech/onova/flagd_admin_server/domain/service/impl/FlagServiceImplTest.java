@@ -8,7 +8,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tech.onova.flagd_admin_server.controller.DTOs.FlagConfigRequestDTO;
 import tech.onova.flagd_admin_server.controller.DTOs.FlagDTO;
-import tech.onova.flagd_admin_server.controller.DTOs.TargetingDTO;
 import tech.onova.flagd_admin_server.domain.entity.Source;
 import tech.onova.flagd_admin_server.domain.entity.SourceId;
 import tech.onova.flagd_admin_server.domain.entity.SourceUri;
@@ -220,7 +219,7 @@ class FlagServiceImplTest {
             "ENABLED",
             "on",
             Map.of("on", true, "off", false),
-            new TargetingDTO(Map.of("userId", "string"), "if (userId == 'test') return true")
+            Map.of("targetingKey", Map.of("userId", "string"), "rule", "if (userId == 'test') return true")
         );
         
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.of(source));
