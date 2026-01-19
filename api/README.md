@@ -11,6 +11,9 @@ A Spring Boot REST API for managing flagd feature flag sources and flags. This s
 - [API Endpoints](#api-endpoints)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
+- [Architecture](#architecture)
+- [Logging](#logging)
+- [Security](#security)
 - [Running the Application](#running-the-application)
 - [Testing](#testing)
 
@@ -27,10 +30,10 @@ The Flagd Admin Server API provides a RESTful interface to:
 - **Java 21**
 - **Spring Boot 4.0.1**
 - **Spring Data JPA** with Hibernate
-- **SQLite** database
+- **SQLite** database (H2 for testing)
 - **Spring Security** with configurable authentication providers
 - **AspectJ** for cross-cutting concerns (logging)
-- **flagd Java SDK** (0.11.19) for feature flag management
+- **flagd Java SDK** (0.11.19) and OpenFeature SDK (1.20.0) for feature flag management
 
 ## Project Structure
 
@@ -103,13 +106,14 @@ api/
 | `application.auth.provider` | no_auth | Authentication provider (no_auth, basic) |
 | `application.auth.provider.basic.user.name` | user | Basic auth username |
 | `application.auth.provider.basic.user.encoded_password` | $2a$12$... | Encoded password (BCrypt) |
+| `application.auth.login.default_redirect_uri` | http://localhost:9090/ | Redirect URI after login |
 | `spring.datasource.url` | jdbc:sqlite:src/main/resources/app.db | SQLite database URL |
 
 ### Authentication Providers
 
 The application supports multiple authentication providers:
 - **no_auth**: No authentication required (default)
-- **basic**: HTTP Basic Authentication
+- **basic**: Form-based authentication with username/password
 
 Configure via `application.auth.provider` property.
 
@@ -320,6 +324,13 @@ DELETE /api/v1/sources/{sourceId}/flags/{flagId}
 }
 ```
 
+### SourceContentInitRequestDTO
+```java
+{
+  "content": String (required, @NotBlank)
+}
+```
+
 ### FlagDTO
 ```java
 {
@@ -418,8 +429,10 @@ The application uses AOP for automatic request/response logging:
 
 Spring Security is configured with pluggable authentication providers:
 
-- **NoAuth**: Disables authentication (useful for development)
-- **BasicAuthProvider**: HTTP Basic Authentication with BCrypt password encoding
+- **NoAuth**: Disables authentication and CSRF protection (useful for development). All requests are permitted.
+- **BasicAuthProvider**: Form-based authentication with username/password and BCrypt password encoding. Includes login form and logout support.
+
+Both providers are configured with CORS support, allowing all origins, methods, headers, and credentials.
 
 Configure via `application.auth.provider` property.
 
@@ -468,12 +481,15 @@ java -jar build/libs/flagd-admin-server-0.0.1-SNAPSHOT.jar
 - **Unit Tests**: JUnit 5 with Mockito
 - **Integration Tests**: Spring Boot Test
 - **Test Database**: H2 (in-memory)
+- **Test Utilities**: TestDataBuilder for creating test data
 
 ### Test Structure
 
 ```
 src/test/java/tech/onova/flagd_admin_server/
 ├── FlagdAdminServerApplicationTests.java
+├── testutil/
+│   └── TestDataBuilder.java
 ├── controller/
 │   ├── SourcesControllerTest.java
 │   └── exception/
@@ -483,13 +499,26 @@ src/test/java/tech/onova/flagd_admin_server/
 │   │   ├── SourceIdTest.java
 │   │   ├── SourceTest.java
 │   │   └── SourceUriTest.java
-│   ├── service/
-│   │   ├── FileSourceContentLoaderTest.java
-│   │   ├── FlagdContentValidatorTest.java
-│   │   └── SourceContentServiceImplTest.java
-└── infrastructure/
-    └── aspect/
-        └── LoggingAspectTest.java
+│   ├── exception/
+│   │   ├── ContentValidationExceptionTest.java
+│   │   ├── DomainExceptionTest.java
+│   │   ├── SourceContentAccessExceptionTest.java
+│   │   ├── SourceContentNotFoundExceptionTest.java
+│   │   ├── SourceNotFoundExceptionTest.java
+│   │   └── UnsupportedSourceUriExceptionTest.java
+│   └── service/
+│       ├── FileSourceContentLoaderTest.java
+│       ├── FlagdContentValidatorTest.java
+│       ├── FlagServiceImplTest.java
+│       └── SourceContentServiceImplTest.java
+├── infrastructure/
+│   └── aspect/
+│       └── LoggingAspectTest.java
+└── security/
+    └── providers/
+        ├── AuthProviderInterfaceTest.java
+        ├── BasicAuthProviderTest.java
+        └── NoAuthProviderTest.java
 ```
 
 ## Additional Resources
