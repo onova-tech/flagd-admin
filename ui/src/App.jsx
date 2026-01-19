@@ -29,32 +29,43 @@ function App() {
   const [saveResult, setSaveResult] = useState(null)
 
   const handleTypeChange = (newType) => {
-    setType(newType)
+    let newVariants
+    let newDefaultVariant
+
     if (newType === "boolean") {
-      setVariants([
+      newVariants = [
         { name: "true", value: true },
         { name: "false", value: false }
-      ])
-      setDefaultVariant("false")
+      ]
+      newDefaultVariant = "false"
     } else if (newType === "string") {
-      setVariants([
+      newVariants = [
         { name: "foo", value: "foo" },
         { name: "bar", value: "bar" }
-      ])
-      setDefaultVariant("foo")
+      ]
+      newDefaultVariant = "foo"
     } else if (newType === "number") {
-      setVariants([
+      newVariants = [
         { name: "1", value: 1 },
         { name: "2", value: 2 }
-      ])
-      setDefaultVariant("1")
+      ]
+      newDefaultVariant = "1"
     } else if (newType === "object") {
-      setVariants([
+      newVariants = [
         { name: "foo", value: JSON.stringify({ foo: "foo" }) },
         { name: "bar", value: JSON.stringify({ bar: "bar" }) }
-      ])
-      setDefaultVariant("foo")
+      ]
+      newDefaultVariant = "foo"
     }
+
+    setType(newType)
+    setVariants(newVariants)
+    setDefaultVariant(newDefaultVariant)
+    setDefaultRule(newDefaultVariant)
+    setRules([{
+      condition: { name: "", operator: "ends_with", subOperator: ">=", value: "" },
+      targetVariant: newDefaultVariant
+    }])
   }
 
   const handleVariantChange = (index, key, value) => {
@@ -150,21 +161,13 @@ function App() {
     const flagdJson = JSON.parse(generateJSON())
     const flagData = flagdJson[flagKey]
     
-    let targeting = null
-    if (hasTargeting && flagData.targeting) {
-      targeting = {
-        targetingKey: {},
-        rule: JSON.stringify(flagData.targeting)
-      }
-    }
-    
     const requestBody = {
       name: flagKey,
       description: description || null,
       state: flagData.state,
       defaultVariant: flagData.defaultVariant || null,
       variants: flagData.variants || null,
-      targeting: targeting
+      targeting: flagData.targeting || null
     }
     
     try {
