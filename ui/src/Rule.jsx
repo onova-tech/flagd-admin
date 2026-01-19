@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types'
 import './Rule.css'
 
 const Rule = ({ index, variants, rule, handleRuleChange, removeRule }) => {
@@ -72,6 +73,25 @@ const Rule = ({ index, variants, rule, handleRuleChange, removeRule }) => {
         </div>
       </div>
     )
+  }
+
+  Rule.propTypes = {
+    index: PropTypes.number.isRequired,
+    variants: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string,
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool, PropTypes.object])
+    })).isRequired,
+    rule: PropTypes.shape({
+      condition: PropTypes.shape({
+        name: PropTypes.string,
+        operator: PropTypes.string,
+        subOperator: PropTypes.string,
+        value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool])
+      }).isRequired,
+      targetVariant: PropTypes.string.isRequired
+    }).isRequired,
+    handleRuleChange: PropTypes.func.isRequired,
+    removeRule: PropTypes.func.isRequired
   }
 
   export default Rule

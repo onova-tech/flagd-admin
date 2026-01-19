@@ -1,14 +1,19 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
+import { useParams, useNavigate } from "react-router-dom"
 import { FlagdCore, MemoryStorage } from "@openfeature/flagd-core"
 import Rule from "./Rule"
 import convertToFlagdFormat from "./convertToFlagdFormat"
 import validateFlagdSchema from "./validateFlagdSchema"
+import convertFromFlagdFormat from "./convertFromFlagdFormat"
 import "./App.css"
 
 const API_BASE_URL = "http://localhost:9090"
 
-function App() {
-  const [flagKey, setFlagKey] = useState("test-feature")
+function FlagEdit() {
+  const { sourceId, flagId } = useParams()
+  const navigate = useNavigate()
+  
+  const [flagKey, setFlagKey] = useState("new-flag")
   const [description, setDescription] = useState("")
   const [state, setState] = useState(true)
   const [type, setType] = useState("boolean")
@@ -31,6 +36,194 @@ function App() {
   const [evaluationContext, setEvaluationContext] = useState("{}")
   const [evaluationResult, setEvaluationResult] = useState(null)
   const [validEvaluationContext, setValidEvaluationContext] = useState(true)
+  const [loading, setLoading] = useState(flagId !== "new")
+  const [source, setSource] = useState(null)
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (sourceId) {
+        await fetchSource()
+      }
+      if (flagId && flagId !== "new") {
+        await fetchFlag()
+      } else {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [sourceId, flagId])
+
+  const fetchSource = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}`)
+      if (response.ok) {
+        const sourceData = await response.json()
+        setSource(sourceData)
+      }
+    } catch (err) {
+      console.error("Error fetching source:", err)
+    }
+  }, [sourceId])
+
+  const fetchFlag = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${flagId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const flagData = await response.json()
+      loadFlagData(flagData)
+    } catch (err) {
+      console.error("Error fetching flag:", err)
+      setSaveResult({ success: false, message: "Error loading flag: " + err.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [sourceId, flagId])
+
+  const loadFlagData = useCallback((flagData) => {
+    const flagKey = flagData.flagId || flagData.name || flagId
+    
+    const variantsObj = flagData.variants || {}
+    const variantEntries = Object.entries(variantsObj)
+    
+    const inferType = (entries) => {
+      if (entries.length === 0) return "string"
+      const firstValue = entries[0][1]
+      if (typeof firstValue === "boolean") return "boolean"
+      if (typeof firstValue === "number") return "number"
+      if (typeof firstValue === "object" && firstValue !== null) return "object"
+      return "string"
+    }
+    
+    const type = inferType(variantEntries)
+    const variants = variantEntries.map(([name, value]) => ({
+      name,
+      value: type === "object" ? JSON.stringify(value) : value
+    }))
+    
+    const defaultVariant = flagData.defaultVariant || variants[0]?.name || ""
+    
+    const targeting = flagData.targeting || {}
+    const hasIf = targeting.if && Array.isArray(targeting.if) && targeting.if.length > 0
+    const hasTargeting = !!hasIf
+    
+    let rules = []
+    let hasDefaultRule = false
+    let defaultRule = variants[0]?.name || ""
+    
+    if (hasTargeting) {
+      const ifArray = targeting.if
+      const hasOddElements = ifArray.length % 2 === 1
+      const pairsToProcess = hasOddElements ? ifArray.length - 1 : ifArray.length
+      
+      for (let i = 0; i < pairsToProcess; i += 2) {
+        const condition = ifArray[i]
+        const targetVariant = ifArray[i + 1]
+        
+        const parsedCondition = parseCondition(condition)
+        rules.push({
+          condition: parsedCondition,
+          targetVariant
+        })
+      }
+      
+      if (hasOddElements) {
+        hasDefaultRule = true
+        defaultRule = ifArray[ifArray.length - 1]
+      }
+    }
+    
+    function parseCondition(condition) {
+      const result = {
+        name: "",
+        operator: "ends_with",
+        subOperator: ">=",
+        value: ""
+      }
+      
+      if (!condition || typeof condition !== 'object') {
+        return result
+      }
+      
+      if (condition["!"]) {
+        const innerCondition = condition["!"]
+        const innerOperator = Object.keys(innerCondition)[0]
+        const innerOperands = innerCondition[innerOperator]
+        
+        if (innerOperands && Array.isArray(innerOperands) && innerOperands[0] && innerOperands[0].var) {
+          result.name = innerOperands[0].var
+        }
+        
+        if (innerOperator === "in") {
+          if (Array.isArray(innerOperands[1])) {
+            result.operator = "not_in_list"
+            result.value = innerOperands[1].join(", ")
+          } else {
+            result.operator = "not_in_string"
+            result.value = innerOperands[1] || ""
+          }
+        }
+        return result
+      }
+      
+      const operators = Object.keys(condition)
+      if (operators.length === 0) {
+        return result
+      }
+      
+      const operator = operators[0]
+      const operands = condition[operator]
+      
+      if (!Array.isArray(operands)) {
+        return result
+      }
+      
+      if (operands[0] && operands[0].var) {
+        result.name = operands[0].var
+      }
+      
+      if (operator === "sem_ver") {
+        result.operator = "sem_ver"
+        result.subOperator = operands[1] || ">="
+        result.value = operands[2] || ""
+        return result
+      }
+      
+      if (operator === "in") {
+        if (Array.isArray(operands[1])) {
+          result.operator = "in_list"
+          result.value = operands[1].join(", ")
+        } else {
+          result.operator = "in_string"
+          result.value = operands[1] || ""
+        }
+        return result
+      }
+      
+      result.operator = operator
+      result.value = operands[1] !== undefined ? String(operands[1]) : ""
+      
+      return result
+    }
+    
+    setFlagKey(flagKey)
+    setDescription(flagData.description || "")
+    setState(flagData.state === "ENABLED")
+    setType(type)
+    setVariants(variants.length > 0 ? variants : [
+      { name: "true", value: true },
+      { name: "false", value: false }
+    ])
+    setDefaultVariant(defaultVariant)
+    setHasTargeting(hasTargeting)
+    setRules(rules.length > 0 ? rules : [{
+      condition: { name: "", operator: "ends_with", subOperator: ">=", value: "" },
+      targetVariant: variants[0]?.name || "true"
+    }])
+    setHasDefaultRule(hasDefaultRule)
+    setDefaultRule(defaultRule)
+  }, [flagId])
 
   const generateJSON = useCallback(() => {
     const json = {
@@ -186,9 +379,12 @@ function App() {
   }
 
   const handleSave = async () => {
-    const sourceId = "2979bd38-fa60-4e3d-8e52-b363cdc80082"
-    const flagId = flagKey
-    
+    if (!sourceId) {
+      setSaveResult({ success: false, message: "No source selected" })
+      return
+    }
+
+    const currentFlagId = flagId === "new" ? flagKey : flagId
     const flagdJson = JSON.parse(generateJSON())
     const flagData = flagdJson.flags[flagKey]
     
@@ -202,7 +398,7 @@ function App() {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${flagId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${currentFlagId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -216,9 +412,20 @@ function App() {
       }
       
       setSaveResult({ success: true, message: "Flag saved successfully" })
+      if (flagId === "new") {
+        navigate(`/sources/${sourceId}/flags/${flagKey}`, { replace: true })
+      }
     } catch (error) {
       console.error("Error saving flag:", error)
       setSaveResult({ success: false, message: "Error saving flag: " + error.message })
+    }
+  }
+
+  const handleBack = () => {
+    if (sourceId) {
+      navigate(`/sources/${sourceId}/flags`)
+    } else {
+      navigate("/")
     }
   }
 
@@ -355,11 +562,27 @@ function App() {
     </div>
   )
 
+  if (loading) {
+    return (
+      <div className="app-container">
+        <header className="app-header">
+          <h1>{flagId === "new" ? "New Flag" : "Edit Flag"}</h1>
+        </header>
+        <div className="loading">Loading...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>flagd ui</h1>
-        <div className="header-actions"></div>
+        <div className="header-breadcrumb">
+          <button className="breadcrumb-link" onClick={handleBack}>Sources</button>
+          <span className="breadcrumb-separator">/</span>
+          <button className="breadcrumb-link" onClick={handleBack}>{source?.name || 'Source'}</button>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{flagId === "new" ? "New Flag" : flagKey}</span>
+        </div>
       </header>
       <div className="app-layout">
         <div className="form-panel">
@@ -490,4 +713,4 @@ function App() {
   )
 }
 
-export default App
+export default FlagEdit
