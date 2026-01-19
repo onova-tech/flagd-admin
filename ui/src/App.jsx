@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { FlagdCore, MemoryStorage } from "@openfeature/flagd-core"
 import Rule from "./Rule"
 import convertToFlagdFormat from "./convertToFlagdFormat"
 import validateFlagdSchema from "./validateFlagdSchema"
@@ -27,6 +28,52 @@ function App() {
 
   const [validationResult, setValidationResult] = useState(null)
   const [saveResult, setSaveResult] = useState(null)
+  const [evaluationContext, setEvaluationContext] = useState("{}")
+  const [evaluationResult, setEvaluationResult] = useState(null)
+  const [validEvaluationContext, setValidEvaluationContext] = useState(true)
+
+  const generateJSON = useCallback(() => {
+    const json = {
+      flagKey,
+      state,
+      type,
+      variants,
+      defaultVariant,
+      hasTargeting,
+      rules,
+      hasDefaultRule,
+      defaultRule
+    }
+    const convertedJson = convertToFlagdFormat(json)
+    return JSON.stringify(convertedJson, null, 2)
+  }, [flagKey, state, type, variants, defaultVariant, hasTargeting, rules, hasDefaultRule, defaultRule])
+
+  const flagStorage = useMemo(() => new MemoryStorage(console), [])
+  const flagdCore = useMemo(
+    () => new FlagdCore(flagStorage, console),
+    [flagStorage]
+  )
+
+  useEffect(() => {
+    try {
+      const flagdJsonString = generateJSON()
+      console.log("Type of flagdJsonString:", typeof flagdJsonString)
+      console.log("flagdJsonString:", flagdJsonString)
+      flagdCore.setConfigurations(flagdJsonString)
+      console.log("Available flags:", Array.from(flagdCore.getFlags().keys()))
+    } catch (err) {
+      console.error("Error setting flagd configuration:", err)
+    }
+  }, [generateJSON, flagdCore])
+
+  useEffect(() => {
+    try {
+      JSON.parse(evaluationContext)
+      setValidEvaluationContext(true)
+    } catch (err) {
+      setValidEvaluationContext(false)
+    }
+  }, [evaluationContext])
 
   const handleTypeChange = (newType) => {
     let newVariants
@@ -128,22 +175,6 @@ function App() {
     setRules(newRules)
   }
 
-  const generateJSON = () => {
-    const json = {
-      flagKey,
-      state,
-      type,
-      variants,
-      defaultVariant,
-      hasTargeting,
-      rules,
-      hasDefaultRule,
-      defaultRule
-    }
-    const convertedJson = convertToFlagdFormat(json)
-    return JSON.stringify(convertedJson, null, 2)
-  }
-
   const handleValidate = () => {
     try {
       const json = JSON.parse(generateJSON())
@@ -159,7 +190,7 @@ function App() {
     const flagId = flagKey
     
     const flagdJson = JSON.parse(generateJSON())
-    const flagData = flagdJson[flagKey]
+    const flagData = flagdJson.flags[flagKey]
     
     const requestBody = {
       name: flagKey,
@@ -188,6 +219,30 @@ function App() {
     } catch (error) {
       console.error("Error saving flag:", error)
       setSaveResult({ success: false, message: "Error saving flag: " + error.message })
+    }
+  }
+
+  const handleEvaluate = () => {
+    try {
+      const context = JSON.parse(evaluationContext)
+      let result
+      switch (type) {
+        case "boolean":
+          result = flagdCore.resolveBooleanEvaluation(flagKey, false, context, console)
+          break
+        case "string":
+          result = flagdCore.resolveStringEvaluation(flagKey, "", context, console)
+          break
+        case "number":
+          result = flagdCore.resolveNumberEvaluation(flagKey, 0, context, console)
+          break
+        case "object":
+          result = flagdCore.resolveObjectEvaluation(flagKey, {}, context, console)
+          break
+      }
+      setEvaluationResult({ success: true, value: result })
+    } catch (error) {
+      setEvaluationResult({ success: false, error: error.message })
     }
   }
 
@@ -282,6 +337,24 @@ function App() {
     </div>
   )
 
+  const evaluationResultBlock = evaluationResult && (
+    <div className={`validation-result ${evaluationResult.success ? 'validation-success' : 'validation-error'}`}>
+      <div className="validation-header">
+        {evaluationResult.success ? 'Evaluation Result' : 'Error'}
+      </div>
+      <div className="validation-errors">
+        {evaluationResult.success ? (
+          typeof evaluationResult.value === 'object' 
+            ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace', fontSize: '14px' }}>{JSON.stringify(evaluationResult.value, null, 2)}</pre>
+            : String(evaluationResult.value)
+        ) : (
+          evaluationResult.error
+        )}
+      </div>
+      <button className="validation-dismiss" onClick={() => setEvaluationResult(null)}>&times;</button>
+    </div>
+  )
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -358,6 +431,44 @@ function App() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+          <div className="form-section">
+            <span className="section-header">Evaluation</span>
+            <div className="targeting-section">
+              <div className="form-group">
+                <label htmlFor="evaluationContext" className="form-label">Evaluation Context (JSON)</label>
+                <textarea 
+                  id="evaluationContext" 
+                  className={validEvaluationContext ? '' : 'input--error'}
+                  value={evaluationContext}
+                  onChange={(e) => setEvaluationContext(e.target.value)}
+                  rows={6}
+                  style={{ 
+                    fontFamily: 'monospace', 
+                    fontSize: '14px', 
+                    resize: 'none',
+                    width: '100%',
+                    padding: 'var(--spacing-3)',
+                    border: 'var(--border-width-thin) solid var(--input-border)',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--input-background)',
+                    color: 'var(--input-text)'
+                  }}
+                />
+                {!validEvaluationContext && (
+                  <div className="form-error">Invalid JSON format</div>
+                )}
+              </div>
+              <button 
+                id="evaluateButton" 
+                className="button button-primary" 
+                onClick={handleEvaluate}
+                disabled={!validEvaluationContext}
+              >
+                Evaluate
+              </button>
+              {evaluationResultBlock}
             </div>
           </div>
         </div>

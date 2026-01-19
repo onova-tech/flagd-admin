@@ -13,7 +13,9 @@ export default function validateFlagdSchema(input) {
         }
     }
 
-    const flagKeys = Object.keys(input)
+    const flags = input.flags || input
+
+    const flagKeys = Object.keys(flags)
 
     // Check for at least one flag
     if (flagKeys.length === 0) {
@@ -25,7 +27,7 @@ export default function validateFlagdSchema(input) {
 
     // Validate each flag
     for (const flagKey of flagKeys) {
-        const flag = input[flagKey]
+        const flag = flags[flagKey]
         validateFlag(flagKey, flag, errors)
     }
 

@@ -68,11 +68,13 @@ export default function convertToFlagdFormat(formData) {
     const targeting = formData.hasTargeting ? { if: ifArray } : {}
 
     return {
-        [formData.flagKey]: {
-            state,
-            variants,
-            defaultVariant,
-            targeting
+        flags: {
+            [formData.flagKey]: {
+                state,
+                variants,
+                defaultVariant,
+                targeting
+            }
         }
     }
 }
