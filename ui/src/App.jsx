@@ -7,7 +7,7 @@ import validateFlagdSchema from "./validateFlagdSchema"
 import convertFromFlagdFormat from "./convertFromFlagdFormat"
 import "./App.css"
 
-const API_BASE_URL = "http://localhost:9090"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
 
 function FlagEdit() {
   const { sourceId, flagId } = useParams()

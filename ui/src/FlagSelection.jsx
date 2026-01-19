@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import "./FlagSelection.css"
 
-const API_BASE_URL = "http://localhost:9090"
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
 
 function FlagSelection() {
   const [flags, setFlags] = useState([])

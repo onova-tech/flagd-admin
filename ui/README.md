@@ -54,7 +54,7 @@ ui/
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 20+
 - npm or yarn
 - Flagd Admin Server API (running on http://localhost:9090 by default)
 

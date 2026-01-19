@@ -37,15 +37,15 @@ A React-based web application (`/ui`) that provides:
 ### Prerequisites
 
 - **Java 21+** (for API)
-- **Node.js 18+** (for UI)
-- **Docker** (optional, for containerized deployment)
+- **Node.js 20+** (for UI)
+- **Docker** or **Podman** (optional, for containerized deployment)
 
 ### Running Locally
 
 #### Run the API
 
 ```bash
-./run-api.sh
+cd api && ./run-api.sh
 ```
 
 The API will be available at `http://localhost:9090`
@@ -53,28 +53,63 @@ The API will be available at `http://localhost:9090`
 #### Run the UI
 
 ```bash
-./run-ui.sh
+cd ui && ./run-ui.sh
 ```
 
 The UI will be available at `http://localhost:5173`
 
-### Running with Docker
+> **Note:** To configure a custom API URL, use the `VITE_API_BASE_URL` build argument:
+> ```bash
+> docker build --build-arg VITE_API_BASE_URL=http://your-api-host:9090 -t flagd-admin-ui .
+> ```
+> Or set the default in `run-ui.sh`:
+> ```bash
+> VITE_API_BASE_URL=http://your-api-host:9090 ./run-ui.sh
+> ```
 
-#### Build the Docker image
+> **Note:** The `-v flagd-data:/app` flag mounts a volume to persist the SQLite database between container restarts.
 
+#### Run the UI
+
+**Docker:**
 ```bash
-docker build -t flagd-admin .
+docker run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 ```
 
-#### Run the API in Docker
-
+**Podman:**
 ```bash
-docker run -p 9090:9090 flagd-admin
+podman run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 ```
 
-The API will be available at `http://localhost:9090`
+The UI will be available at `http://localhost:5173`
 
-> **Note**: The Docker image currently includes the API only. Run the UI separately using `npm run dev` in the `ui` directory.
+#### Stop and remove containers
+
+**Docker:**
+```bash
+docker stop flagd-admin-api flagd-admin-ui
+docker rm flagd-admin-api flagd-admin-ui
+```
+
+**Podman:**
+```bash
+podman stop flagd-admin-api flagd-admin-ui
+podman rm flagd-admin-api flagd-admin-ui
+```
+
+#### View logs
+
+**Docker:**
+```bash
+docker logs flagd-admin-api
+docker logs flagd-admin-ui
+```
+
+**Podman:**
+```bash
+podman logs flagd-admin-api
+podman logs flagd-admin-ui
+```
 
 ## Usage
 
@@ -187,11 +222,13 @@ cd api
 ```bash
 cd ui
 npm install          # Install dependencies
-npm run dev          # Start development server
+VITE_API_BASE_URL=http://localhost:9090 npm run dev  # Start development server with custom API URL
 npm run build        # Build for production
 npm run test         # Run tests
 npm run lint         # Run ESLint
 ```
+
+> **Note:** The UI uses the `VITE_API_BASE_URL` environment variable to connect to the API. Default is `http://localhost:9090`.
 
 ## Configuration
 
@@ -246,6 +283,8 @@ flagd-admin/
 │   │   │       └── application.properties
 │   │   └── test/
 │   ├── build.gradle               # Gradle build configuration
+│   ├── Dockerfile                 # Docker configuration for API
+│   ├── run-api.sh                 # Script to run API locally
 │   └── README.md                  # API documentation
 ├── ui/                           # React UI application
 │   ├── src/
@@ -257,10 +296,9 @@ flagd-admin/
 │   │   ├── convertFromFlagdFormat.js  # flagd to UI format
 │   │   └── validateFlagdSchema.js     # Schema validation
 │   ├── package.json
+│   ├── Dockerfile                 # Docker configuration for UI
+│   ├── run-ui.sh                  # Script to run UI locally
 │   └── README.md                 # UI documentation
-├── run-api.sh                   # Script to run API locally
-├── run-ui.sh                    # Script to run UI locally
-├── Dockerfile                   # Docker configuration
 └── README.md                    # This file
 ```
 
