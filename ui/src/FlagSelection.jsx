@@ -8,7 +8,7 @@ function FlagSelection() {
   const [source, setSource] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
+  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   const { sourceId } = useParams()
   const navigate = useNavigate()
 
@@ -40,10 +40,10 @@ function FlagSelection() {
   }, [sourceId, apiBaseUrl])
 
   useEffect(() => {
-    if (sourceId) {
+    if (sourceId && apiBaseUrl) {
       fetchSourceAndFlags()
     }
-  }, [sourceId, fetchSourceAndFlags])
+  }, [sourceId, apiBaseUrl, fetchSourceAndFlags])
 
   const handleFlagClick = (flagId) => {
     navigate(`/sources/${sourceId}/flags/${flagId}`)

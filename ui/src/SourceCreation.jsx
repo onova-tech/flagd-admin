@@ -8,7 +8,7 @@ function SourceCreation() {
   const [uri, setUri] = useState("")
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
+  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -17,6 +17,12 @@ function SourceCreation() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    if (!apiBaseUrl) {
+      setError("API configuration not loaded yet. Please try again.")
+      return
+    }
+    
     setLoading(true)
     setError(null)
 

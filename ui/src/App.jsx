@@ -11,7 +11,7 @@ import "./App.css"
 function FlagEdit() {
   const { sourceId, flagId } = useParams()
   const navigate = useNavigate()
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
+  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   
   const [flagKey, setFlagKey] = useState("new-flag")
   const [description, setDescription] = useState("")
@@ -43,20 +43,6 @@ function FlagEdit() {
     getApiBaseUrl().then(setApiBaseUrl)
   }, [])
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (sourceId) {
-        await fetchSource()
-      }
-      if (flagId && flagId !== "new") {
-        await fetchFlag()
-      } else {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [sourceId, flagId])
-
   const fetchSource = useCallback(async () => {
     try {
       const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}`)
@@ -84,6 +70,22 @@ function FlagEdit() {
       setLoading(false)
     }
   }, [sourceId, flagId, apiBaseUrl])
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (sourceId) {
+        await fetchSource()
+      }
+      if (flagId && flagId !== "new") {
+        await fetchFlag()
+      } else {
+        setLoading(false)
+      }
+    }
+    if (apiBaseUrl) {
+      loadData()
+    }
+  }, [sourceId, flagId, apiBaseUrl, fetchSource, fetchFlag])
 
   const loadFlagData = useCallback((flagData) => {
     const flagKey = flagData.flagId || flagData.name || flagId
@@ -385,6 +387,11 @@ function FlagEdit() {
   const handleSave = async () => {
     if (!sourceId) {
       setSaveResult({ success: false, message: "No source selected" })
+      return
+    }
+
+    if (!apiBaseUrl) {
+      setSaveResult({ success: false, message: "API configuration not loaded yet. Please try again." })
       return
     }
 

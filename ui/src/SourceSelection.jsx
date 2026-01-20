@@ -7,15 +7,17 @@ function SourceSelection() {
   const [sources, setSources] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
+  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
     getApiBaseUrl().then((url) => {
       setApiBaseUrl(url)
       fetchSources(url)
-    }).catch(() => {
-      fetchSources('http://localhost:9090')
+    }).catch((err) => {
+      console.error('Failed to get API base URL:', err)
+      setError(err.message)
+      setLoading(false)
     })
   }, [])
 
