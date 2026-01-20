@@ -1,22 +1,26 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { getApiBaseUrl } from "./config"
 import "./FlagSelection.css"
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
 
 function FlagSelection() {
   const [flags, setFlags] = useState([])
   const [source, setSource] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
   const { sourceId } = useParams()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getApiBaseUrl().then(setApiBaseUrl)
+  }, [])
 
   const fetchSourceAndFlags = useCallback(async () => {
     try {
       const [sourceResponse, flagsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}`),
-        fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags`)
+        fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}`),
+        fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags`)
       ])
 
       if (!sourceResponse.ok || !flagsResponse.ok) {
@@ -33,7 +37,7 @@ function FlagSelection() {
     } finally {
       setLoading(false)
     }
-  }, [sourceId])
+  }, [sourceId, apiBaseUrl])
 
   useEffect(() => {
     if (sourceId) {

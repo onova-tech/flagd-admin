@@ -1,7 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
+import { getApiBaseUrl } from "./config"
 
 function SourceCreation() {
   const [name, setName] = useState("")
@@ -9,7 +8,12 @@ function SourceCreation() {
   const [uri, setUri] = useState("")
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    getApiBaseUrl().then(setApiBaseUrl)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -23,7 +27,7 @@ function SourceCreation() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/sources`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

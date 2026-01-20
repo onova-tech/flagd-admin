@@ -1,22 +1,27 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { getApiBaseUrl } from "./config"
 import "./SourceSelection.css"
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
 
 function SourceSelection() {
   const [sources, setSources] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchSources()
+    getApiBaseUrl().then((url) => {
+      setApiBaseUrl(url)
+      fetchSources(url)
+    }).catch(() => {
+      fetchSources('http://localhost:9090')
+    })
   }, [])
 
-  const fetchSources = async () => {
+  const fetchSources = async (baseUrl = apiBaseUrl) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources`)
+      const response = await fetch(`${baseUrl}/api/v1/sources`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }

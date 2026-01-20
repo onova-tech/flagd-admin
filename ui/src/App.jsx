@@ -1,17 +1,17 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { FlagdCore, MemoryStorage } from "@openfeature/flagd-core"
+import { getApiBaseUrl } from "./config"
 import Rule from "./Rule"
 import convertToFlagdFormat from "./convertToFlagdFormat"
 import validateFlagdSchema from "./validateFlagdSchema"
 import convertFromFlagdFormat from "./convertFromFlagdFormat"
 import "./App.css"
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9090"
-
 function FlagEdit() {
   const { sourceId, flagId } = useParams()
   const navigate = useNavigate()
+  const [apiBaseUrl, setApiBaseUrl] = useState('http://localhost:9090')
   
   const [flagKey, setFlagKey] = useState("new-flag")
   const [description, setDescription] = useState("")
@@ -40,6 +40,10 @@ function FlagEdit() {
   const [source, setSource] = useState(null)
 
   useEffect(() => {
+    getApiBaseUrl().then(setApiBaseUrl)
+  }, [])
+
+  useEffect(() => {
     const loadData = async () => {
       if (sourceId) {
         await fetchSource()
@@ -55,7 +59,7 @@ function FlagEdit() {
 
   const fetchSource = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}`)
+      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}`)
       if (response.ok) {
         const sourceData = await response.json()
         setSource(sourceData)
@@ -63,11 +67,11 @@ function FlagEdit() {
     } catch (err) {
       console.error("Error fetching source:", err)
     }
-  }, [sourceId])
+  }, [sourceId, apiBaseUrl])
 
   const fetchFlag = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${flagId}`)
+      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags/${flagId}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -79,7 +83,7 @@ function FlagEdit() {
     } finally {
       setLoading(false)
     }
-  }, [sourceId, flagId])
+  }, [sourceId, flagId, apiBaseUrl])
 
   const loadFlagData = useCallback((flagData) => {
     const flagKey = flagData.flagId || flagData.name || flagId
@@ -398,7 +402,7 @@ function FlagEdit() {
     }
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/sources/${sourceId}/flags/${currentFlagId}`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags/${currentFlagId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

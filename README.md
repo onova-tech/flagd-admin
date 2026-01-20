@@ -58,13 +58,14 @@ cd ui && ./run-ui.sh
 
 The UI will be available at `http://localhost:5173`
 
-> **Note:** To configure a custom API URL, use the `VITE_API_BASE_URL` build argument:
+> **Note:** To configure a custom API URL, modify `config.json` before running the container:
 > ```bash
-> docker build --build-arg VITE_API_BASE_URL=http://your-api-host:9090 -t flagd-admin-ui .
-> ```
-> Or set the default in `run-ui.sh`:
-> ```bash
-> VITE_API_BASE_URL=http://your-api-host:9090 ./run-ui.sh
+> cat > config.json << EOF
+> {
+>   "apiBaseUrl": "http://your-api-host:9090"
+> }
+> EOF
+> docker run -d -p 5173:80 -v $(pwd)/config.json:/usr/share/nginx/html/config.json --name flagd-admin-ui flagd-admin-ui
 > ```
 
 > **Note:** The `-v flagd-data:/app` flag mounts a volume to persist the SQLite database between container restarts.
@@ -222,13 +223,13 @@ cd api
 ```bash
 cd ui
 npm install          # Install dependencies
-VITE_API_BASE_URL=http://localhost:9090 npm run dev  # Start development server with custom API URL
+npm run dev          # Start development server
 npm run build        # Build for production
 npm run test         # Run tests
 npm run lint         # Run ESLint
 ```
 
-> **Note:** The UI uses the `VITE_API_BASE_URL` environment variable to connect to the API. Default is `http://localhost:9090`.
+> **Note:** The UI uses `config.json` to connect to the API. Default is `http://localhost:9090`. Modify `config.json` to use a different API endpoint.
 
 ## Configuration
 
@@ -300,6 +301,82 @@ flagd-admin/
 │   ├── run-ui.sh                  # Script to run UI locally
 │   └── README.md                 # UI documentation
 └── README.md                    # This file
+```
+
+## S3 Deployment
+
+The UI can be deployed to AWS S3 for static hosting with runtime API configuration.
+
+### Configuration
+
+The UI uses `config.json` to set the API endpoint at runtime. This allows you to:
+- Deploy the same build to multiple environments
+- Update API URL without rebuilding
+- Manage configuration separately from code
+
+### Setup
+
+1. **Create environment-specific config files:**
+
+   `config.production.json`:
+   ```json
+   {
+     "apiBaseUrl": "https://api.production.com"
+   }
+   ```
+
+   `config.staging.json`:
+   ```json
+   {
+     "apiBaseUrl": "https://api.staging.com"
+   }
+   ```
+
+2. **Build the UI:**
+   ```bash
+   cd ui
+   npm run build
+   ```
+
+3. **Deploy to S3:**
+
+   **Production:**
+   ```bash
+   aws s3 cp dist/ s3://your-production-bucket/ --recursive
+   aws s3 cp config.production.json s3://your-production-bucket/config.json --content-type application/json
+   aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+   ```
+
+   **Staging:**
+   ```bash
+   aws s3 cp dist/ s3://your-staging-bucket/ --recursive
+   aws s3 cp config.staging.json s3://your-staging-bucket/config.json --content-type application/json
+   aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+   ```
+
+### Updating API URL
+
+To change the API URL without redeploying:
+
+```bash
+aws s3 cp config.production.json s3://your-production-bucket/config.json --content-type application/json
+aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/config.json"
+```
+
+### Local Development
+
+For local development, the UI uses `config.json` with the local API URL:
+
+```bash
+npm run dev
+```
+
+Or override at runtime by editing `config.json`:
+
+```json
+{
+  "apiBaseUrl": "http://localhost:9090"
+}
 ```
 
 ## Testing

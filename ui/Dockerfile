@@ -12,10 +12,9 @@ FROM docker.io/nginx:alpine
 
 RUN apk add --no-cache wget
 
-ARG VITE_API_BASE_URL=http://localhost:9090
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-
 COPY --from=builder /build/dist /usr/share/nginx/html
+
+COPY config.json /usr/share/nginx/html/
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
