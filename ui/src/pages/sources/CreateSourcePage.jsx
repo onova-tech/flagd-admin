@@ -1,27 +1,17 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getApiBaseUrl } from "./config"
+import { post } from "../../services/api"
 
-function SourceCreation() {
+function CreateSourcePage() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [uri, setUri] = useState("")
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   const navigate = useNavigate()
-
-  useEffect(() => {
-    getApiBaseUrl().then(setApiBaseUrl)
-  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!apiBaseUrl) {
-      setError("API configuration not loaded yet. Please try again.")
-      return
-    }
     
     setLoading(true)
     setError(null)
@@ -33,22 +23,27 @@ function SourceCreation() {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/sources`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody)
-      })
+      const response = await post(`/api/v1/sources`, requestBody)
 
       if (!response.ok) {
-        const errorText = await response.text()
+        let errorText
+        try {
+          errorText = await response.text()
+        } catch {
+          errorText = "Unknown error"
+        }
         throw new Error(`HTTP error! status: ${response.status}, ${errorText}`)
       }
 
-      const source = await response.json()
+      let source
+      try {
+        source = await response.json()
+      } catch {
+        throw new Error("Invalid response from server")
+      }
       navigate(`/sources/${source.id}/flags`)
     } catch (err) {
+      console.error('Source creation error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -142,4 +137,4 @@ function SourceCreation() {
   )
 }
 
-export default SourceCreation
+export default CreateSourcePage

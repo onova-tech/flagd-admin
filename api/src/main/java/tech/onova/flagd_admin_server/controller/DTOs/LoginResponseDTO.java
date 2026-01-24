@@ -1,0 +1,3 @@
+package tech.onova.flagd_admin_server.controller.DTOs;
+
+public record LoginResponseDTO(String accessToken, String refreshToken, String type) {}

@@ -1,49 +1,57 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { getApiBaseUrl } from "./config"
-import "./FlagSelection.css"
+import { get } from "../../services/api"
+import "./FlagListPage.css"
 
-function FlagSelection() {
+function FlagListPage() {
   const [flags, setFlags] = useState([])
   const [source, setSource] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   const { sourceId } = useParams()
   const navigate = useNavigate()
-
-  useEffect(() => {
-    getApiBaseUrl().then(setApiBaseUrl)
-  }, [])
 
   const fetchSourceAndFlags = useCallback(async () => {
     try {
       const [sourceResponse, flagsResponse] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}`),
-        fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags`)
+        get(`/api/v1/sources/${sourceId}`),
+        get(`/api/v1/sources/${sourceId}/flags`)
       ])
 
       if (!sourceResponse.ok || !flagsResponse.ok) {
         throw new Error(`HTTP error! status: ${sourceResponse.status} or ${flagsResponse.status}`)
       }
 
-      const sourceData = await sourceResponse.json()
-      const flagsData = await flagsResponse.json()
+      let sourceData, flagsData
+      try {
+        sourceData = await sourceResponse.json()
+      } catch {
+        console.error('Source JSON parsing error')
+        sourceData = null
+      }
+      
+      try {
+        flagsData = await flagsResponse.json()
+      } catch {
+        console.error('Flags JSON parsing error')
+        flagsData = { flags: [] }
+      }
 
       setSource(sourceData)
-      setFlags(flagsData.flags || [])
+      const flagsArray = flagsData && flagsData.flags ? flagsData.flags : []
+      setFlags(flagsArray)
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [sourceId, apiBaseUrl])
+  }, [sourceId])
 
   useEffect(() => {
-    if (sourceId && apiBaseUrl) {
+    if (sourceId) {
       fetchSourceAndFlags()
     }
-  }, [sourceId, apiBaseUrl, fetchSourceAndFlags])
+  }, [sourceId, fetchSourceAndFlags])
 
   const handleFlagClick = (flagId) => {
     navigate(`/sources/${sourceId}/flags/${flagId}`)
@@ -151,4 +159,4 @@ function FlagSelection() {
   )
 }
 
-export default FlagSelection
+export default FlagListPage

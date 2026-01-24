@@ -1,17 +1,16 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { FlagdCore, MemoryStorage } from "@openfeature/flagd-core"
-import { getApiBaseUrl } from "./config"
-import Rule from "./Rule"
-import convertToFlagdFormat from "./convertToFlagdFormat"
-import validateFlagdSchema from "./validateFlagdSchema"
-import convertFromFlagdFormat from "./convertFromFlagdFormat"
-import "./App.css"
+import { get, post } from "../../services/api"
+import Rule from "./components/Rule"
+import convertToFlagdFormat from "../../features/flags/utils/convertToFlagdFormat"
+import validateFlagdSchema from "../../features/flags/utils/validateFlagdSchema"
 
-function FlagEdit() {
+import "./FlagEditPage.css"
+
+function FlagEditPage() {
   const { sourceId, flagId } = useParams()
   const navigate = useNavigate()
-  const [apiBaseUrl, setApiBaseUrl] = useState(null)
   
   const [flagKey, setFlagKey] = useState("new-flag")
   const [description, setDescription] = useState("")
@@ -39,29 +38,35 @@ function FlagEdit() {
   const [loading, setLoading] = useState(flagId !== "new")
   const [source, setSource] = useState(null)
 
-  useEffect(() => {
-    getApiBaseUrl().then(setApiBaseUrl)
-  }, [])
-
   const fetchSource = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}`)
+      const response = await get(`/api/v1/sources/${sourceId}`)
       if (response.ok) {
-        const sourceData = await response.json()
+        let sourceData
+        try {
+          sourceData = await response.json()
+        } catch {
+          sourceData = null
+        }
         setSource(sourceData)
       }
     } catch (err) {
       console.error("Error fetching source:", err)
     }
-  }, [sourceId, apiBaseUrl])
+  }, [sourceId])
 
   const fetchFlag = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags/${flagId}`)
+      const response = await get(`/api/v1/sources/${sourceId}/flags/${flagId}`)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      const flagData = await response.json()
+      let flagData
+      try {
+        flagData = await response.json()
+      } catch {
+        flagData = null
+      }
       loadFlagData(flagData)
     } catch (err) {
       console.error("Error fetching flag:", err)
@@ -69,7 +74,7 @@ function FlagEdit() {
     } finally {
       setLoading(false)
     }
-  }, [sourceId, flagId, apiBaseUrl])
+  }, [sourceId, flagId])
 
   useEffect(() => {
     const loadData = async () => {
@@ -82,12 +87,31 @@ function FlagEdit() {
         setLoading(false)
       }
     }
-    if (apiBaseUrl) {
-      loadData()
-    }
-  }, [sourceId, flagId, apiBaseUrl, fetchSource, fetchFlag])
+    loadData()
+  }, [sourceId, flagId, fetchSource, fetchFlag])  
 
   const loadFlagData = useCallback((flagData) => {
+    if (!flagData) {
+      // Handle case where flagData is null or undefined
+      setFlagKey("new-flag")
+      setDescription("")
+      setState(true)
+      setType("boolean")
+      setVariants([
+        { name: "true", value: true },
+        { name: "false", value: false }
+      ])
+      setDefaultVariant("false")
+      setHasTargeting(false)
+      setRules([{
+        condition: { name: "", operator: "ends_with", subOperator: ">=", value: "" },
+        targetVariant: "true"
+      }])
+      setHasDefaultRule(false)
+      setDefaultRule("false")
+      return
+    }
+
     const flagKey = flagData.flagId || flagData.name || flagId
     
     const variantsObj = flagData.variants || {}
@@ -390,10 +414,6 @@ function FlagEdit() {
       return
     }
 
-    if (!apiBaseUrl) {
-      setSaveResult({ success: false, message: "API configuration not loaded yet. Please try again." })
-      return
-    }
 
     const currentFlagId = flagId === "new" ? flagKey : flagId
     const flagdJson = JSON.parse(generateJSON())
@@ -409,16 +429,15 @@ function FlagEdit() {
     }
     
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/sources/${sourceId}/flags/${currentFlagId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody)
-      })
+      const response = await post(`/api/v1/sources/${sourceId}/flags/${currentFlagId}`, requestBody)
       
       if (!response.ok) {
-        const errorText = await response.text()
+        let errorText
+        try {
+          errorText = await response.text()
+        } catch {
+          errorText = "Unknown error"
+        }
         throw new Error(`HTTP error! status: ${response.status}, ${errorText}`)
       }
       
@@ -724,4 +743,4 @@ function FlagEdit() {
   )
 }
 
-export default FlagEdit
+export default FlagEditPage

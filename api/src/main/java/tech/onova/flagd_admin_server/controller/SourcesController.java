@@ -13,6 +13,7 @@ import tech.onova.flagd_admin_server.domain.repository.SourceRepository;
 import tech.onova.flagd_admin_server.domain.service.SourceContentService;
 import tech.onova.flagd_admin_server.domain.service.FlagService;
 import tech.onova.flagd_admin_server.infrastructure.annotation.Log;
+import tech.onova.flagd_admin_server.security.AuthenticationUtil;
 
 import java.util.List;
 import java.util.UUID;
@@ -81,7 +82,7 @@ public class SourcesController {
                 request.name(),
                 request.description(),
                 new SourceUri(request.uri()),
-                "system",
+                AuthenticationUtil.getCurrentUsername(),
                 request.enabled()
         );
 
@@ -115,7 +116,7 @@ public class SourcesController {
                 request.name(),
                 request.description(),
                 new SourceUri(request.uri()),
-                "system",
+                AuthenticationUtil.getCurrentUsername(),
                 true
         );
         sourceContentService.initializeContentWithConfig(source.getUri());

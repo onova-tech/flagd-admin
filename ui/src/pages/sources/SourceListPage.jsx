@@ -1,35 +1,41 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { getApiBaseUrl } from "./config"
-import "./SourceSelection.css"
+import { useAuth } from "../../contexts/AuthContext"
+import { get } from "../../services/api"
+import "./SourceListPage.css"
 
-function SourceSelection() {
+function SourceListPage() {
   const [sources, setSources] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [apiBaseUrl, setApiBaseUrl] = useState(null)
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
-    getApiBaseUrl().then((url) => {
-      setApiBaseUrl(url)
-      fetchSources(url)
-    }).catch((err) => {
-      console.error('Failed to get API base URL:', err)
-      setError(err.message)
-      setLoading(false)
-    })
+    fetchSources()
   }, [])
 
-  const fetchSources = async (baseUrl = apiBaseUrl) => {
+  const fetchSources = async () => {
     try {
-      const response = await fetch(`${baseUrl}/api/v1/sources`)
+      const response = await get('/api/v1/sources')
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      const data = await response.json()
-      setSources(data)
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError)
+        data = []
+      }
+      if (Array.isArray(data)) {
+        setSources(data)
+      } else {
+        console.error('Expected array but got:', typeof data, data)
+        setError('Invalid response format from server')
+      }
     } catch (err) {
+      console.error('Fetch sources error:', err)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -46,10 +52,17 @@ function SourceSelection() {
 
   if (loading) {
     return (
-      <div className="source-selection-container">
+<div className="source-selection-container">
         <header className="app-header">
-          <h1>Sources</h1>
-          <div className="header-actions"></div>
+          <div className="header-content">
+            <h1>Feature Flag Sources</h1>
+            <div className="header-actions">
+              <span className="user-info">Welcome, {user?.username}</span>
+              <button className="button button-secondary" onClick={logout}>
+                Logout
+              </button>
+            </div>
+          </div>
         </header>
         <div className="loading">Loading...</div>
       </div>
@@ -108,4 +121,4 @@ function SourceSelection() {
   )
 }
 
-export default SourceSelection
+export default SourceListPage

@@ -7,24 +7,13 @@ import static org.assertj.core.api.Assertions.*;
 class AuthProviderInterfaceTest {
 
     @Test
-    void noAuthProvider_ShouldImplementAuthProvider() {
+    void jwtAuthProvider_ShouldImplementAuthProvider() {
         // When
-        AuthProvider provider = new NoAuth();
+        AuthProvider provider = new JwtAuthProvider();
 
         // Then
         assertThat(provider).isNotNull();
-        assertThat(provider.getName()).isEqualTo("no_auth");
-        assertThat(provider.passwordEncoder()).isNotNull();
-    }
-
-    @Test
-    void basicAuthProvider_ShouldImplementAuthProvider() {
-        // When
-        AuthProvider provider = new BasicAuthProvider();
-
-        // Then
-        assertThat(provider).isNotNull();
-        assertThat(provider.getName()).isEqualTo("basic");
+        assertThat(provider.getName()).isEqualTo("jwt");
         assertThat(provider.passwordEncoder()).isNotNull();
     }
 }

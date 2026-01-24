@@ -5,6 +5,24 @@
   width: 100%;
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.user-info {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 .sources-list {
   display: flex;
   flex-direction: column;

@@ -4,23 +4,23 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.*;
 
-class BasicAuthProviderTest {
+class JwtAuthProviderTest {
 
     @Test
     void shouldImplementAuthProvider() {
         // Given
-        AuthProvider provider = new BasicAuthProvider();
+        AuthProvider provider = new JwtAuthProvider();
 
         // Then
         assertThat(provider).isNotNull();
-        assertThat(provider.getName()).isEqualTo("basic");
+        assertThat(provider.getName()).isEqualTo("jwt");
         assertThat(provider.passwordEncoder()).isNotNull();
     }
 
     @Test
     void shouldReturnBCryptPasswordEncoder() {
         // Given
-        BasicAuthProvider provider = new BasicAuthProvider();
+        JwtAuthProvider provider = new JwtAuthProvider();
 
         // When
         var encoder = provider.passwordEncoder();

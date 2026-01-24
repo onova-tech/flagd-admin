@@ -1,22 +1,47 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import SourceSelection from './SourceSelection.jsx'
-import SourceCreation from './SourceCreation.jsx'
-import FlagSelection from './FlagSelection.jsx'
-import FlagEdit from './App.jsx'
+import { AuthProvider } from './contexts/AuthContext'
+import ProtectedRoute from './components/common/ProtectedRoute'
+import Login from './pages/auth/Login'
+import SourceSelection from './pages/sources/SourceListPage'
+import SourceCreation from './pages/sources/CreateSourcePage'
+import FlagSelection from './pages/flags/FlagListPage'
+import FlagEdit from './pages/flags/FlagEditPage'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import './index.css'
 import './components.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<SourceSelection />} />
-        <Route path="/sources/new" element={<SourceCreation />} />
-        <Route path="/sources/:sourceId/flags" element={<FlagSelection />} />
-        <Route path="/sources/:sourceId/flags/:flagId" element={<FlagEdit />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={
+              <ProtectedRoute>
+                <SourceSelection />
+              </ProtectedRoute>
+            } />
+            <Route path="/sources/new" element={
+              <ProtectedRoute>
+                <SourceCreation />
+              </ProtectedRoute>
+            } />
+            <Route path="/sources/:sourceId/flags" element={
+              <ProtectedRoute>
+                <FlagSelection />
+              </ProtectedRoute>
+            } />
+            <Route path="/sources/:sourceId/flags/:flagId" element={
+              <ProtectedRoute>
+                <FlagEdit />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 )
