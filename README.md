@@ -22,7 +22,7 @@ A Spring Boot REST API (`/api`) that provides:
 - Flag management endpoints
 - Content validation and loading
 - SQLite database for persistence
-- Pluggable authentication (no-auth or basic auth)
+- JWT-based authentication with login/logout functionality
 
 ### User Interface
 A React-based web application (`/ui`) that provides:
@@ -58,7 +58,19 @@ cd ui && ./run-ui.sh
 
 The UI will be available at `http://localhost:5173`
 
-> **Note:** To configure a custom API URL, modify `config.json` before running the container:
+#### Run with Docker
+
+**API Server:**
+```bash
+docker run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
+```
+
+**UI Application:**
+```bash
+docker run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
+```
+
+> **Note:** To configure a custom API URL for the UI, create a `config.json` file:
 > ```bash
 > cat > config.json << EOF
 > {
@@ -68,16 +80,20 @@ The UI will be available at `http://localhost:5173`
 > docker run -d -p 5173:80 -v $(pwd)/config.json:/usr/share/nginx/html/config.json --name flagd-admin-ui flagd-admin-ui
 > ```
 
-> **Note:** The `-v flagd-data:/app` flag mounts a volume to persist the SQLite database between container restarts.
-
-#### Run the UI
-
-**Docker:**
+**API Server:**
 ```bash
-docker run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
+# Development with auto-generation
+podman run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
+
+# Production with explicit configuration
+podman run -d -p 9090:9090 \
+  -e FLAGD_JWT_SECRET="$(./api/scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./api/scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin-api flagd-admin-api
 ```
 
-**Podman:**
+**UI Application:**
 ```bash
 podman run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 ```
@@ -233,24 +249,47 @@ npm run lint         # Run ESLint
 
 ## Configuration
 
+### Environment Variables
+
+The Flagd Admin API supports configuration via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLAGD_AUTH_PROVIDER` | jwt | Authentication provider |
+| `FLAGD_JWT_SECRET` | (auto-generated) | JWT signing secret (required for production) |
+| `FLAGD_ADMIN_USERNAME` | admin | Default admin username |
+| `FLAGD_ADMIN_PASSWORD_HASH` | (auto-generated for "pass") | BCrypt hash of admin password |
+| `FLAGD_ACCESS_TOKEN_EXPIRATION` | 900000 | Access token expiration (ms) |
+| `FLAGD_REFRESH_TOKEN_EXPIRATION` | 604800000 | Refresh token expiration (ms) |
+| `FLAGD_LOGIN_REDIRECT_URI` | http://localhost:9090/ | Login redirect URL |
+
 ### API Configuration
 
-Edit `api/src/main/resources/application.properties`:
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `server.port` | 9090 | Server port |
-| `application.auth.provider` | no_auth | Authentication provider (no_auth, basic) |
-| `spring.datasource.url` | jdbc:sqlite:... | SQLite database URL |
+Edit `api/src/main/resources/application.properties` or use environment variables above.
 
 ### Authentication
 
-The API supports multiple authentication providers:
+The API uses JWT-based authentication:
 
-- **no_auth**: No authentication required (default, development mode)
-- **basic**: Form-based authentication with username/password
+- **jwt**: JSON Web Token authentication with login/logout endpoints
+- **Login**: `POST /api/v1/auth/login` with username/password
+- **Refresh**: `POST /api/v1/auth/refresh` with refresh token
+- **Protected**: All API endpoints require valid JWT token
 
-Configure via `application.auth.provider` property.
+#### Password Hash Generation
+```bash
+# Generate hash for custom password
+./api/scripts/generate-password-hash.sh yourpassword
+
+# Interactive password entry
+./api/scripts/generate-password-hash.sh
+```
+
+#### JWT Secret Generation
+```bash
+# Generate secure JWT secret
+./api/scripts/generate-jwt-secret.sh
+```
 
 ## Flagd Integration
 
@@ -289,13 +328,31 @@ flagd-admin/
 │   └── README.md                  # API documentation
 ├── ui/                           # React UI application
 │   ├── src/
-│   │   ├── App.jsx              # Main application
-│   │   ├── SourceSelection.jsx   # Sources list page
-│   │   ├── SourceCreation.jsx   # Create source page
-│   │   ├── FlagSelection.jsx    # Flags list page
-│   │   ├── convertToFlagdFormat.js    # UI to flagd format
-│   │   ├── convertFromFlagdFormat.js  # flagd to UI format
-│   │   └── validateFlagdSchema.js     # Schema validation
+│   │   ├── main.jsx             # Application entry point
+│   │   ├── pages/               # Page components
+│   │   │   ├── auth/            # Authentication pages
+│   │   │   │   └── Login.jsx    # Login page
+│   │   │   ├── sources/        # Source management pages
+│   │   │   │   ├── SourceListPage.jsx    # Sources list page
+│   │   │   │   └── CreateSourcePage.jsx  # Create source page
+│   │   │   └── flags/           # Flag management pages
+│   │   │       ├── FlagListPage.jsx      # Flags list page
+│   │   │       └── FlagEditPage.jsx      # Flag edit page
+│   │   ├── components/          # Reusable components
+│   │   │   └── common/          # Common components
+│   │   │       ├── ProtectedRoute.jsx    # Authentication wrapper
+│   │   │       └── ErrorBoundary.jsx     # Error handling
+│   │   ├── contexts/            # React contexts
+│   │   │   └── AuthContext.jsx  # Authentication context
+│   │   ├── services/            # API services
+│   │   │   └── api.js           # API client
+│   │   ├── features/            # Feature-specific utilities
+│   │   │   └── flags/
+│   │   │       └── utils/       # Flag utilities
+│   │   │           ├── convertToFlagdFormat.js     # UI to flagd format
+│   │   │           ├── convertFromFlagdFormat.js   # flagd to UI format
+│   │   │           └── validateFlagdSchema.js      # Schema validation
+│   │   └── config.js            # Application configuration
 │   ├── package.json
 │   ├── Dockerfile                 # Docker configuration for UI
 │   ├── run-ui.sh                  # Script to run UI locally

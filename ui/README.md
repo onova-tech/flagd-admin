@@ -19,7 +19,8 @@ A modern React-based web interface for managing [flagd](https://flagd.dev/) feat
 - **React Router DOM 7.12.0** - Client-side routing
 - **Vite 5.2.0** - Build tool and dev server
 - **@openfeature/flagd-core 1.1.0** - Flagd SDK for evaluation
-- **Vitest 1.4.0** - Testing framework
+- **Vitest 1.6.0** - Testing framework
+- **@vitejs/plugin-react-swc 3.5.0** - React plugin with SWC compilation
 - **ESLint** - Code linting
 
 ## Project Structure
@@ -27,20 +28,34 @@ A modern React-based web interface for managing [flagd](https://flagd.dev/) feat
 ```
 ui/
 ├── src/
-│   ├── App.jsx                 # Main application and flag edit page
-│   ├── SourceSelection.jsx     # Sources list page
-│   ├── SourceCreation.jsx       # Create new source page
-│   ├── FlagSelection.jsx       # Flags list for a source
-│   ├── Rule.jsx                # Targeting rule component
 │   ├── main.jsx                # Application entry point
-│   ├── convertToFlagdFormat.js # Convert UI model to flagd format
-│   ├── convertFromFlagdFormat.js # Convert flagd format to UI model
-│   ├── validateFlagdSchema.js  # Schema validation
+│   ├── pages/                  # Page components
+│   │   ├── auth/               # Authentication pages
+│   │   │   └── Login.jsx       # Login page
+│   │   ├── sources/            # Source management pages
+│   │   │   ├── SourceListPage.jsx    # Sources list page
+│   │   │   └── CreateSourcePage.jsx  # Create source page
+│   │   └── flags/              # Flag management pages
+│   │       ├── FlagListPage.jsx      # Flags list page
+│   │       ├── FlagEditPage.jsx      # Flag edit page
+│   │       └── components/
+│   │           └── Rule.jsx          # Targeting rule component
+│   ├── components/             # Reusable components
+│   │   └── common/             # Common components
+│   │       ├── ProtectedRoute.jsx    # Authentication wrapper
+│   │       └── ErrorBoundary.jsx     # Error handling
+│   ├── contexts/               # React contexts
+│   │   └── AuthContext.jsx     # Authentication context
+│   ├── services/               # API services
+│   │   └── api.js              # API client
+│   ├── features/               # Feature-specific utilities
+│   │   └── flags/
+│   │       └── utils/          # Flag utilities
+│   │           ├── convertToFlagdFormat.js     # UI to flagd format
+│   │           ├── convertFromFlagdFormat.js   # flagd to UI format
+│   │           └── validateFlagdSchema.js      # Schema validation
+│   ├── config.js               # Application configuration
 │   ├── App.css                 # App layout and structure
-│   ├── SourceSelection.css     # Source page styles
-│   ├── FlagSelection.css       # Flag list styles
-│   ├── SourceCreation.css      # Source creation styles
-│   ├── Rule.css                # Rule component styles
 │   ├── components.css          # Reusable component styles
 │   ├── tokens.css              # CSS variables (tokens)
 │   └── index.css               # Global styles
@@ -149,8 +164,15 @@ View the generated flagd JSON configuration in real-time. Use the "Validate" but
 The UI communicates with the Flagd Admin Server API:
 
 - **Base URL**: `http://localhost:9090/api/v1`
+- **Authentication**: POST `/auth/login`, POST `/auth/refresh`
 - **Sources**: GET `/sources`, POST `/sources`, PATCH `/sources/{id}`, GET `/sources/{id}/contents`
 - **Flags**: GET `/sources/{id}/flags`, GET `/sources/{id}/flags/{flagId}`, POST `/sources/{id}/flags/{flagId}`, DELETE `/sources/{id}/flags/{flagId}`
+
+**Authentication Flow**:
+1. User logs in via `/auth/login` with username/password
+2. UI receives JWT access and refresh tokens
+3. Access token is stored and used for all API requests in Authorization header
+4. Refresh token is used to obtain new access tokens when current expires
 
 See the [API documentation](../api/README.md) for more details.
 

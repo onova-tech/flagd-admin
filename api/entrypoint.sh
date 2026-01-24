@@ -1,12 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
-echo "🚀 Starting Flagd Admin API..."
+echo "🚀 Flagd Admin API Container Starting..."
 
-# Ensure database file exists
-[ -f src/main/resources/app.db ] || touch src/main/resources/app.db
-
-# Auto-generate JWT secret if not provided
+# Validate or generate JWT secret
 if [ -z "$FLAGD_JWT_SECRET" ]; then
     echo "⚠️  FLAGD_JWT_SECRET not set, generating secure random secret..."
     export FLAGD_JWT_SECRET=$(openssl rand -base64 32)
@@ -19,9 +16,9 @@ if [ -z "$FLAGD_ADMIN_USERNAME" ]; then
     export FLAGD_ADMIN_USERNAME="admin"
 fi
 
-# Auto-generate password hash for "pass" if not provided
+# Generate password hash if not provided
 if [ -z "$FLAGD_ADMIN_PASSWORD_HASH" ]; then
-    echo "⚠️  FLAGD_ADMIN_PASSWORD_HASH not set, generating hash for default password: pass"
+    echo "⚠️  FLAGD_ADMIN_PASSWORD_HASH not set, generating hash for 'pass'..."
     export FLAGD_ADMIN_PASSWORD_HASH=$(python3 -c "
 import bcrypt
 password = 'pass'
@@ -32,14 +29,11 @@ print(hashed.decode('utf-8'))
     echo "✅ Generated password hash for '$FLAGD_ADMIN_USERNAME'"
 fi
 
-# Show configuration summary
-echo "📋 Configuration Summary:"
-echo "   • Auth Provider: ${FLAGD_AUTH_PROVIDER:-jwt}"
+# Show configuration
+echo "📋 Container Configuration:"
 echo "   • Admin Username: $FLAGD_ADMIN_USERNAME"
-echo "   • Access Token Expiration: ${FLAGD_ACCESS_TOKEN_EXPIRATION:-900000}ms"
-echo "   • Refresh Token Expiration: ${FLAGD_REFRESH_TOKEN_EXPIRATION:-604800000}ms"
-echo ""
+echo "   • JWT Secret: ${FLAGD_JWT_SECRET:0:10}..."
+echo "   • Access Token Expiration: ${FLAGD_ACCESS_TOKEN_EXPIRATION}ms"
+echo "   • Refresh Token Expiration: ${FLAGD_REFRESH_TOKEN_EXPIRATION}ms"
 
-# Start application
-echo "🔄 Starting Spring Boot application..."
-./gradlew bootRun
+exec "$@"
