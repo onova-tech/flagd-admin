@@ -299,6 +299,98 @@
   font-size: var(--font-size-sm);
 }
 
+/* Edit button (blue) */
+.button-edit {
+  background: var(--color-primary-500);
+  color: var(--text-inverse);
+  border-color: var(--color-primary-500);
+}
+
+.button-edit:hover:not(:disabled) {
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  box-shadow: var(--shadow-sm);
+}
+
+.button-edit:active:not(:disabled) {
+  background: var(--color-primary-700);
+  transform: scale(0.98);
+}
+
+.button-edit:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Download button (blue) */
+.button-download {
+  background: var(--color-primary-500);
+  color: var(--text-inverse);
+  border-color: var(--color-primary-500);
+}
+
+.button-download:hover:not(:disabled) {
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
+  box-shadow: var(--shadow-sm);
+}
+
+.button-download:active:not(:disabled) {
+  background: var(--color-primary-700);
+  transform: scale(0.98);
+}
+
+.button-download:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Delete button (red) */
+.button-delete {
+  background: var(--color-error-500);
+  color: var(--text-inverse);
+  border-color: var(--color-error-500);
+}
+
+.button-delete:hover:not(:disabled) {
+  background: var(--color-error-600);
+  border-color: var(--color-error-600);
+  box-shadow: var(--shadow-sm);
+}
+
+.button-delete:active:not(:disabled) {
+  background: var(--color-error-700);
+  transform: scale(0.98);
+}
+
+.button-delete:focus-visible {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+}
+
+/* Confirmation state for delete button */
+.button-delete-confirm {
+  background: var(--color-error-600);
+  color: var(--text-inverse);
+  border-color: var(--color-error-600);
+  font-size: var(--font-size-xs);
+  padding: 0 var(--spacing-2);
+  min-width: 60px;
+}
+
+.button-delete-confirm:hover:not(:disabled) {
+  background: var(--color-error-600);
+  border-color: var(--color-error-600);
+}
+
+/* ==========================================
+   ITEM ACTIONS
+   ========================================== */
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin-left: var(--spacing-3);
+}
+
 /* ==========================================
    FORM GROUPS & LABELS
    ========================================== */

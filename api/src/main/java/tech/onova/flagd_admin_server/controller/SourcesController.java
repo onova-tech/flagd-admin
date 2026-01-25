@@ -135,6 +135,20 @@ public class SourcesController {
                   HttpStatus.CREATED);
     }
 
+    @DeleteMapping("/sources/{sourceId}")
+    @Log
+    public ResponseEntity<Void> deleteSource(@PathVariable UUID sourceId) {
+        var sourceOption = sourceRepository.findById(new SourceId(sourceId));
+
+        if (sourceOption.isEmpty())
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+
+        var source = sourceOption.get();
+        sourceRepository.delete(source);
+
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
     @GetMapping("/sources/{sourceId}/contents")
     @Log
     public ResponseEntity<SourceContentResponseDTO> getSourceContents(@PathVariable UUID sourceId) {

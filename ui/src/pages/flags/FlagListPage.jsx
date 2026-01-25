@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { get } from "../../services/api"
+import { get, del } from "../../services/api"
 import "./FlagListPage.css"
 
 function FlagListPage() {
@@ -8,6 +8,8 @@ function FlagListPage() {
   const [source, setSource] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [deleteConfirmations, setDeleteConfirmations] = useState({})
+  const [deletingIds, setDeletingIds] = useState({})
   const { sourceId } = useParams()
   const navigate = useNavigate()
 
@@ -63,6 +65,38 @@ function FlagListPage() {
 
   const handleBackToSources = () => {
     navigate("/")
+  }
+
+  const handleDeleteFlag = async (flagId, event) => {
+    event.stopPropagation()
+    
+    if (deleteConfirmations[flagId]) {
+      // Perform deletion
+      try {
+        setDeletingIds(prev => ({ ...prev, [flagId]: true }))
+        const response = await del(`/api/v1/sources/${sourceId}/flags/${flagId}`)
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        // Remove from state
+        setFlags(prev => prev.filter(flag => flag.flagId !== flagId))
+        setDeleteConfirmations(prev => ({ ...prev, [flagId]: false }))
+      } catch (err) {
+        console.error('Delete flag error:', err)
+        setError(`Failed to delete flag: ${err.message}`)
+      } finally {
+        setDeletingIds(prev => ({ ...prev, [flagId]: false }))
+      }
+    } else {
+      // Show confirmation
+      setDeleteConfirmations(prev => ({ ...prev, [flagId]: true }))
+      // Auto-hide confirmation after 3 seconds
+      setTimeout(() => {
+        setDeleteConfirmations(prev => ({ ...prev, [flagId]: false }))
+      }, 3000)
+    }
   }
 
   if (loading) {
@@ -149,7 +183,28 @@ function FlagListPage() {
                     )}
                   </div>
                 </div>
-                <div className="flag-arrow">→</div>
+                <div className="item-actions">
+                  {deleteConfirmations[flag.flagId] ? (
+                    <button
+                      className="button button-small button-delete-confirm"
+                      onClick={(e) => handleDeleteFlag(flag.flagId, e)}
+                      disabled={deletingIds[flag.flagId]}
+                      title="Confirm delete"
+                    >
+                      {deletingIds[flag.flagId] ? '...' : 'confirm?'}
+                    </button>
+                  ) : (
+                    <button
+                      className="button button-small button-delete"
+                      onClick={(e) => handleDeleteFlag(flag.flagId, e)}
+                      disabled={deletingIds[flag.flagId]}
+                      title="Delete flag"
+                    >
+                      <span className="material-icons">delete</span>
+                    </button>
+                  )}
+                  <div className="flag-arrow">→</div>
+                </div>
               </div>
             )
           })

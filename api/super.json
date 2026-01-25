@@ -1,0 +1,28 @@
+{
+  "$schema" : "https://flagd.dev/schema/v0/flags.json",
+  "flags" : {
+    "new-flag-2" : {
+      "key" : "new-flag-2",
+      "state" : "ENABLED",
+      "name" : "new-flag-2",
+      "defaultVariant" : "false",
+      "variants" : {
+        "true" : true,
+        "false" : false
+      },
+      "targeting" : { }
+    },
+    "new-flag" : {
+      "key" : "new-flag",
+      "state" : "ENABLED",
+      "name" : "new-flag",
+      "description" : "Super",
+      "defaultVariant" : "false",
+      "variants" : {
+        "true" : true,
+        "false" : false
+      },
+      "targeting" : { }
+    }
+  }
+}
