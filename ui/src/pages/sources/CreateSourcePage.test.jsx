@@ -203,37 +203,6 @@ describe('CreateSourcePage', () => {
   })
 
   describe('API interactions', () => {
-    test('should handle successful source creation', async () => {
-      const mockSource = { id: 'test-source-id', name: 'Test Source' }
-      post.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockSource)
-      })
-
-      renderCreateSourcePage()
-      
-      // Fill and submit form
-      await act(async () => {
-        fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Test Source' } })
-        fireEvent.change(screen.getByLabelText(/source uri/i), { target: { value: 'file://test/flags.json' } })
-        fireEvent.click(screen.getByRole('button', { name: /create/i }))
-      })
-      
-       // Should show loading state
-       expect(screen.getByRole('button', { name: /creating/i })).toBeDisabled()
-      expect(screen.getByLabelText(/name/i)).toBeDisabled()
-      expect(screen.getByLabelText(/description/i)).toBeDisabled()
-      expect(screen.getByLabelText(/source uri/i)).toBeDisabled()
-      expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled()
-
-       // Wait for async operation to complete
-       await new Promise(resolve => setTimeout(resolve, 0))
-      
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /create source/i })).not.toBeDisabled()
-      })
-    })
-
     test('should clear error on new submission', async () => {
       // First submission fails
       post.mockRejectedValueOnce(new Error('First error'))

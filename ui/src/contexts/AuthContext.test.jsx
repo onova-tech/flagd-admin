@@ -95,9 +95,17 @@ describe('AuthContext', () => {
     function TestComponent() {
       const { login, user, loading } = useAuth()
       
+      const handleLogin = async () => {
+        try {
+          await login('testuser', 'testpass')
+        } catch (error) {
+          // Expected in error tests
+        }
+      }
+      
       return (
         <div>
-          <button onClick={() => login('testuser', 'testpass')}>
+          <button onClick={handleLogin}>
             Login
           </button>
           <div data-testid="user">{user ? JSON.stringify(user) : 'null'}</div>
@@ -150,16 +158,13 @@ await waitFor(() => {
       )
 
       const loginButton = screen.getByText('Login')
-      
-      await waitFor(() => {
-        fireEvent.click(loginButton)
-      })
+      fireEvent.click(loginButton)
 
-await waitFor(() => {
-         expect(localStorage.setItem).not.toHaveBeenCalledWith('accessToken', expect.any(String))
-         const userDisplay = screen.getByTestId('user')
-         expect(userDisplay).toHaveTextContent('null')
-       })
+      await waitFor(() => {
+        expect(localStorage.setItem).not.toHaveBeenCalledWith('accessToken', expect.any(String))
+        const userDisplay = screen.getByTestId('user')
+        expect(userDisplay).toHaveTextContent('null')
+      })
     })
 
     test('should handle network error during login', async () => {
