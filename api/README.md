@@ -98,28 +98,105 @@ api/
 
 ## Configuration
 
-### Application Properties
+### Environment Variable Configuration
 
-| Property | Default | Description |
+The application supports configuration via environment variables:
+
+| Variable | Default | Description |
 |----------|---------|-------------|
-| `server.port` | 9090 | Server port |
-| `application.auth.provider` | no_auth | Authentication provider (no_auth, basic) |
-| `application.auth.provider.basic.user.name` | user | Basic auth username |
-| `application.auth.provider.basic.user.encoded_password` | $2a$12$... | Encoded password (BCrypt) |
-| `application.auth.login.default_redirect_uri` | http://localhost:9090/ | Redirect URI after login |
-| `spring.datasource.url` | jdbc:sqlite:src/main/resources/app.db | SQLite database URL |
+| `FLAGD_AUTH_PROVIDER` | jwt | Authentication provider |
+| `FLAGD_JWT_SECRET` | (auto-generated) | JWT signing secret (required for production) |
+| `FLAGD_ADMIN_USERNAME` | admin | Default admin username |
+| `FLAGD_ADMIN_PASSWORD_HASH` | (auto-generated for "pass") | BCrypt hash of admin password |
+| `FLAGD_ACCESS_TOKEN_EXPIRATION` | 900000 | Access token expiration (ms) |
+| `FLAGD_REFRESH_TOKEN_EXPIRATION` | 604800000 | Refresh token expiration (ms) |
+| `FLAGD_LOGIN_REDIRECT_URI` | http://localhost:9090/ | Login redirect URL |
+
+### Required Variables for Production
+
+- `FLAGD_JWT_SECRET`: Secure random string (min 256 bits)
+- `FLAGD_ADMIN_USERNAME`: Admin username  
+- `FLAGD_ADMIN_PASSWORD_HASH`: BCrypt hash of admin password
+
+### Utility Scripts
+
+The API includes helper scripts for secure configuration:
+
+#### Password Hash Generation
+```bash
+# Generate hash for custom password
+./scripts/generate-password-hash.sh yourpassword
+
+# Interactive password entry
+./scripts/generate-password-hash.sh
+```
+
+#### JWT Secret Generation
+```bash
+# Generate secure JWT secret
+./scripts/generate-jwt-secret.sh
+```
 
 ### Authentication Providers
 
-The application supports multiple authentication providers:
-- **no_auth**: No authentication required (default)
-- **basic**: Form-based authentication with username/password
+The application uses JWT-based authentication:
+- **jwt**: JSON Web Token authentication (default)
+  - Login endpoint: `POST /api/v1/auth/login`
+  - Token refresh endpoint: `POST /api/v1/auth/refresh`
+  - All protected endpoints require valid JWT token in Authorization header
 
-Configure via `application.auth.provider` property.
+Configure via `FLAGD_AUTH_PROVIDER` environment variable.
 
 ## API Endpoints
 
 Base URL: `http://localhost:9090/api/v1`
+
+### Authentication
+
+#### Login
+```
+POST /api/v1/auth/login
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "token": "jwt_access_token",
+  "refreshToken": "jwt_refresh_token",
+  "expiresIn": 3600
+}
+```
+
+#### Refresh Token
+```
+POST /api/v1/auth/refresh
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "refreshToken": "jwt_refresh_token"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "token": "new_jwt_access_token",
+  "refreshToken": "new_jwt_refresh_token",
+  "expiresIn": 3600
+}
+```
 
 ### Sources
 
@@ -427,14 +504,20 @@ The application uses AOP for automatic request/response logging:
 
 ## Security
 
-Spring Security is configured with pluggable authentication providers:
+Spring Security is configured with JWT-based authentication:
 
-- **NoAuth**: Disables authentication and CSRF protection (useful for development). All requests are permitted.
-- **BasicAuthProvider**: Form-based authentication with username/password and BCrypt password encoding. Includes login form and logout support.
+- **JwtAuthProvider**: JSON Web Token authentication with access and refresh tokens
+  - Login endpoint validates credentials and issues JWT tokens
+  - Access tokens are short-lived (configurable expiration)
+  - Refresh tokens allow token renewal without re-authentication
+  - All protected endpoints require valid JWT token in Authorization header: `Bearer <token>`
 
-Both providers are configured with CORS support, allowing all origins, methods, headers, and credentials.
+The JWT provider is configured with CORS support, allowing all origins, methods, headers, and credentials.
 
-Configure via `application.auth.provider` property.
+JWT Configuration Properties:
+- `application.auth.jwt.secret` - Secret key for token signing
+- `application.auth.jwt.access-token-expiration` - Access token expiration time (default: 3600s)
+- `application.auth.jwt.refresh-token-expiration` - Refresh token expiration time (default: 86400s)
 
 ## Running the Application
 
@@ -452,11 +535,45 @@ cd api
 # Build the project
 ./gradlew build
 
-# Run the application
+# Run with auto-generation (development)
+./run-api.sh
+
+# Or run directly with Gradle
 ./gradlew bootRun
 ```
 
 The server will start on `http://localhost:9090`
+
+### Running with Custom Configuration
+
+```bash
+# Set custom admin credentials
+export FLAGD_ADMIN_USERNAME="myadmin"
+export FLAGD_ADMIN_PASSWORD_HASH="$(./scripts/generate-password-hash.sh mysecretpass)"
+
+# Set custom JWT secret
+export FLAGD_JWT_SECRET="$(./scripts/generate-jwt-secret.sh | tail -1)"
+
+# Run with custom configuration
+./run-api.sh
+```
+
+### Docker Deployment
+
+```bash
+# Build Docker image
+docker build -t flagd-admin-api .
+
+# Run with auto-generation (development)
+docker run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
+
+# Run with explicit configuration (production)
+docker run -d -p 9090:9090 \
+  -e FLAGD_JWT_SECRET="$(./scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin-api flagd-admin-api
+```
 
 ### Build JAR and Run
 
@@ -464,7 +581,11 @@ The server will start on `http://localhost:9090`
 # Build executable JAR
 ./gradlew build
 
-# Run JAR
+# Run JAR with environment variables
+export FLAGD_JWT_SECRET="$(./scripts/generate-jwt-secret.sh | tail -1)"
+export FLAGD_ADMIN_USERNAME="myadmin"
+export FLAGD_ADMIN_PASSWORD_HASH="$(./scripts/generate-password-hash.sh mysecretpass)"
+
 java -jar build/libs/flagd-admin-server-0.0.1-SNAPSHOT.jar
 ```
 

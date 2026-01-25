@@ -162,9 +162,9 @@
   --input-placeholder: var(--text-tertiary);
 
   /* Code/JSON display */
-  --code-background: var(--color-neutral-800);
-  --code-text: var(--color-neutral-100);
-  --code-border: var(--color-neutral-700);
+  --code-background: var(--surface-secondary);
+  --code-text: var(--text-primary);
+  --code-border: var(--border-default);
 }
 
 /* ==========================================
@@ -206,10 +206,10 @@
     --input-border: var(--color-neutral-700);
     --input-border-hover: var(--color-neutral-600);
 
-    /* Code/JSON (slightly lighter background in dark mode) */
-    --code-background: var(--color-neutral-900);
-    --code-text: var(--color-neutral-100);
-    --code-border: var(--color-neutral-800);
+    /* Code/JSON (respect dark mode theme) */
+    --code-background: var(--surface-secondary);
+    --code-text: var(--text-primary);
+    --code-border: var(--border-default);
 
     /* Adjust shadows for dark mode (more subtle) */
     --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);

@@ -1,0 +1,14 @@
+package tech.onova.flagd_admin_server.controller.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
+public record SourcePatchRequestDTO(@NotBlank(message="Source name is required")
+                                    String name,
+                                    @NotBlank(message="Source description is required")
+                                    String description,
+                                    @Pattern(regexp = "^(file://).*$",
+                                             message="Source uri must start with file://")
+                                    String uri,
+                                    boolean enabled) {
+}

@@ -6,27 +6,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import tech.onova.flagd_admin_server.controller.DTOs.*;
+import tech.onova.flagd_admin_server.controller.dto.response.*;
 import tech.onova.flagd_admin_server.controller.exception.GlobalExceptionHandler;
+import tech.onova.flagd_admin_server.controller.mapper.SourceMapper;
 import tech.onova.flagd_admin_server.domain.entity.Source;
 import tech.onova.flagd_admin_server.domain.entity.SourceId;
 import tech.onova.flagd_admin_server.domain.entity.SourceUri;
-import tech.onova.flagd_admin_server.domain.exception.SourceContentNotFoundException;
 import tech.onova.flagd_admin_server.domain.repository.SourceRepository;
 import tech.onova.flagd_admin_server.domain.service.FlagService;
 import tech.onova.flagd_admin_server.domain.service.SourceContentService;
-import tech.onova.flagd_admin_server.infrastructure.annotation.Log;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -46,6 +41,9 @@ class SourcesControllerTest {
     @Mock
     private SourceContentService sourceContentService;
     
+    @Mock
+    private SourceMapper sourceMapper;
+    
     private ObjectMapper objectMapper = new ObjectMapper();
 
     private Source testSource = new Source(
@@ -60,7 +58,7 @@ class SourcesControllerTest {
 
     @BeforeEach
     void setUp() {
-        SourcesController sourcesController = new SourcesController(sourceRepository, sourceContentService, flagService);
+        SourcesController sourcesController = new SourcesController(sourceRepository, sourceContentService, sourceMapper);
         mockMvc = MockMvcBuilders.standaloneSetup(sourcesController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -78,6 +76,18 @@ class SourcesControllerTest {
         );
         
         when(sourceRepository.findByEnabled(true)).thenReturn(List.of(enabledSource));
+        when(sourceMapper.toResponseDTO(enabledSource)).thenReturn(
+                new SourceResponseDTO(
+                        enabledSource.getId().id(),
+                        enabledSource.getName(),
+                        enabledSource.getDescription(),
+                        enabledSource.getUri().uri(),
+                        enabledSource.isEnabled(),
+                        enabledSource.getCreationDateTime(),
+                        enabledSource.getLastUpdateDateTime(),
+                        enabledSource.getLastUpdateUserName()
+                )
+        );
 
         // When & Then
         mockMvc.perform(get("/api/v1/sources"))
@@ -89,6 +99,18 @@ class SourcesControllerTest {
     void shouldGetSource() throws Exception {
         // Given
         when(sourceRepository.findById(new SourceId(testSourceId))).thenReturn(Optional.of(testSource));
+        when(sourceMapper.toResponseDTO(testSource)).thenReturn(
+                new SourceResponseDTO(
+                        testSource.getId().id(),
+                        testSource.getName(),
+                        testSource.getDescription(),
+                        testSource.getUri().uri(),
+                        testSource.isEnabled(),
+                        testSource.getCreationDateTime(),
+                        testSource.getLastUpdateDateTime(),
+                        testSource.getLastUpdateUserName()
+                )
+        );
 
         // When & Then
         mockMvc.perform(get("/api/v1/sources/{sourceId}", testSourceId))
@@ -112,55 +134,6 @@ class SourcesControllerTest {
     }
 
     @Test
-    void shouldGetFlags() throws Exception {
-        // Given
-        List<FlagDTO> flags = List.of(
-            new FlagDTO("test-flag", "Test Flag", "A test flag", "ENABLED", "on", Map.of("on", true, "off", false), null)
-        );
-        when(flagService.getFlags(new SourceId(testSourceId))).thenReturn(flags);
-
-        // When & Then
-        mockMvc.perform(get("/api/v1/sources/{sourceId}/flags", testSourceId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.flags", hasSize(1)))
-            .andExpect(jsonPath("$.flags[0].flagId").value("test-flag"))
-            .andExpect(jsonPath("$.flags[0].name").value("Test Flag"))
-            .andExpect(jsonPath("$.flags[0].state").value("ENABLED"))
-            .andExpect(jsonPath("$.flags[0].defaultVariant").value("on"));
-    }
-
-    @Test
-    void shouldAddOrUpdateFlag() throws Exception {
-        // Given
-        FlagConfigRequestDTO request = new FlagConfigRequestDTO(
-                "Updated Test Flag",
-                "Updated Description",
-                "ENABLED",
-                "on",
-                Map.of("on", true, "off", false),
-                null
-        );
-        
-        doNothing().when(flagService).addOrUpdateFlag(eq(new SourceId(testSourceId)), eq("test-flag"), any(FlagConfigRequestDTO.class));
-
-        // When & Then
-        mockMvc.perform(post("/api/v1/sources/{sourceId}/flags/{flagId}", testSourceId, "test-flag")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isNoContent());
-    }
-
-    @Test
-    void shouldDeleteFlag() throws Exception {
-        // Given
-        doNothing().when(flagService).deleteFlag(eq(new SourceId(testSourceId)), eq("test-flag"));
-
-        // When & Then
-        mockMvc.perform(delete("/api/v1/sources/{sourceId}/flags/{flagId}", testSourceId, "test-flag"))
-            .andExpect(status().isNoContent());
-    }
-
-    @Test
     void shouldReturnNotFoundForNonExistentSource() throws Exception {
         // Given
         UUID nonExistentId = UUID.randomUUID();
@@ -168,16 +141,6 @@ class SourcesControllerTest {
 
         // When & Then
         mockMvc.perform(get("/api/v1/sources/{sourceId}", nonExistentId))
-            .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void shouldReturnNotFoundForNonExistentFlag() throws Exception {
-        // Given
-        when(flagService.getFlags(new SourceId(testSourceId))).thenThrow(new SourceContentNotFoundException("Source not found"));
-
-        // When & Then
-        mockMvc.perform(get("/api/v1/sources/{sourceId}/flags", testSourceId))
             .andExpect(status().isNotFound());
     }
 }

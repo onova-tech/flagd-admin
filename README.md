@@ -22,7 +22,7 @@ A Spring Boot REST API (`/api`) that provides:
 - Flag management endpoints
 - Content validation and loading
 - SQLite database for persistence
-- Pluggable authentication (no-auth or basic auth)
+- JWT-based authentication with login/logout functionality
 
 ### User Interface
 A React-based web application (`/ui`) that provides:
@@ -37,15 +37,15 @@ A React-based web application (`/ui`) that provides:
 ### Prerequisites
 
 - **Java 21+** (for API)
-- **Node.js 18+** (for UI)
-- **Docker** (optional, for containerized deployment)
+- **Node.js 20+** (for UI)
+- **Docker** or **Podman** (optional, for containerized deployment)
 
 ### Running Locally
 
 #### Run the API
 
 ```bash
-./run-api.sh
+cd api && ./run-api.sh
 ```
 
 The API will be available at `http://localhost:9090`
@@ -53,28 +53,80 @@ The API will be available at `http://localhost:9090`
 #### Run the UI
 
 ```bash
-./run-ui.sh
+cd ui && ./run-ui.sh
 ```
 
 The UI will be available at `http://localhost:5173`
 
-### Running with Docker
+#### Run with Docker
 
-#### Build the Docker image
-
+**API Server:**
 ```bash
-docker build -t flagd-admin .
+docker run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
 ```
 
-#### Run the API in Docker
-
+**UI Application:**
 ```bash
-docker run -p 9090:9090 flagd-admin
+docker run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 ```
 
-The API will be available at `http://localhost:9090`
+> **Note:** To configure a custom API URL for the UI, create a `config.json` file:
+> ```bash
+> cat > config.json << EOF
+> {
+>   "apiBaseUrl": "http://your-api-host:9090"
+> }
+> EOF
+> docker run -d -p 5173:80 -v $(pwd)/config.json:/usr/share/nginx/html/config.json --name flagd-admin-ui flagd-admin-ui
+> ```
 
-> **Note**: The Docker image currently includes the API only. Run the UI separately using `npm run dev` in the `ui` directory.
+**API Server:**
+```bash
+# Development with auto-generation
+podman run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
+
+# Production with explicit configuration
+podman run -d -p 9090:9090 \
+  -e FLAGD_JWT_SECRET="$(./api/scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./api/scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin-api flagd-admin-api
+```
+
+**UI Application:**
+```bash
+podman run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
+```
+
+The UI will be available at `http://localhost:5173`
+
+#### Stop and remove containers
+
+**Docker:**
+```bash
+docker stop flagd-admin-api flagd-admin-ui
+docker rm flagd-admin-api flagd-admin-ui
+```
+
+**Podman:**
+```bash
+podman stop flagd-admin-api flagd-admin-ui
+podman rm flagd-admin-api flagd-admin-ui
+```
+
+#### View logs
+
+**Docker:**
+```bash
+docker logs flagd-admin-api
+docker logs flagd-admin-ui
+```
+
+**Podman:**
+```bash
+podman logs flagd-admin-api
+podman logs flagd-admin-ui
+```
 
 ## Usage
 
@@ -193,26 +245,51 @@ npm run test         # Run tests
 npm run lint         # Run ESLint
 ```
 
+> **Note:** The UI uses `config.json` to connect to the API. Default is `http://localhost:9090`. Modify `config.json` to use a different API endpoint.
+
 ## Configuration
+
+### Environment Variables
+
+The Flagd Admin API supports configuration via environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLAGD_AUTH_PROVIDER` | jwt | Authentication provider |
+| `FLAGD_JWT_SECRET` | (auto-generated) | JWT signing secret (required for production) |
+| `FLAGD_ADMIN_USERNAME` | admin | Default admin username |
+| `FLAGD_ADMIN_PASSWORD_HASH` | (auto-generated for "pass") | BCrypt hash of admin password |
+| `FLAGD_ACCESS_TOKEN_EXPIRATION` | 900000 | Access token expiration (ms) |
+| `FLAGD_REFRESH_TOKEN_EXPIRATION` | 604800000 | Refresh token expiration (ms) |
+| `FLAGD_LOGIN_REDIRECT_URI` | http://localhost:9090/ | Login redirect URL |
 
 ### API Configuration
 
-Edit `api/src/main/resources/application.properties`:
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `server.port` | 9090 | Server port |
-| `application.auth.provider` | no_auth | Authentication provider (no_auth, basic) |
-| `spring.datasource.url` | jdbc:sqlite:... | SQLite database URL |
+Edit `api/src/main/resources/application.properties` or use environment variables above.
 
 ### Authentication
 
-The API supports multiple authentication providers:
+The API uses JWT-based authentication:
 
-- **no_auth**: No authentication required (default, development mode)
-- **basic**: Form-based authentication with username/password
+- **jwt**: JSON Web Token authentication with login/logout endpoints
+- **Login**: `POST /api/v1/auth/login` with username/password
+- **Refresh**: `POST /api/v1/auth/refresh` with refresh token
+- **Protected**: All API endpoints require valid JWT token
 
-Configure via `application.auth.provider` property.
+#### Password Hash Generation
+```bash
+# Generate hash for custom password
+./api/scripts/generate-password-hash.sh yourpassword
+
+# Interactive password entry
+./api/scripts/generate-password-hash.sh
+```
+
+#### JWT Secret Generation
+```bash
+# Generate secure JWT secret
+./api/scripts/generate-jwt-secret.sh
+```
 
 ## Flagd Integration
 
@@ -246,22 +323,117 @@ flagd-admin/
 │   │   │       └── application.properties
 │   │   └── test/
 │   ├── build.gradle               # Gradle build configuration
+│   ├── Dockerfile                 # Docker configuration for API
+│   ├── run-api.sh                 # Script to run API locally
 │   └── README.md                  # API documentation
 ├── ui/                           # React UI application
 │   ├── src/
-│   │   ├── App.jsx              # Main application
-│   │   ├── SourceSelection.jsx   # Sources list page
-│   │   ├── SourceCreation.jsx   # Create source page
-│   │   ├── FlagSelection.jsx    # Flags list page
-│   │   ├── convertToFlagdFormat.js    # UI to flagd format
-│   │   ├── convertFromFlagdFormat.js  # flagd to UI format
-│   │   └── validateFlagdSchema.js     # Schema validation
+│   │   ├── main.jsx             # Application entry point
+│   │   ├── pages/               # Page components
+│   │   │   ├── auth/            # Authentication pages
+│   │   │   │   └── Login.jsx    # Login page
+│   │   │   ├── sources/        # Source management pages
+│   │   │   │   ├── SourceListPage.jsx    # Sources list page
+│   │   │   │   └── CreateSourcePage.jsx  # Create source page
+│   │   │   └── flags/           # Flag management pages
+│   │   │       ├── FlagListPage.jsx      # Flags list page
+│   │   │       └── FlagEditPage.jsx      # Flag edit page
+│   │   ├── components/          # Reusable components
+│   │   │   └── common/          # Common components
+│   │   │       ├── ProtectedRoute.jsx    # Authentication wrapper
+│   │   │       └── ErrorBoundary.jsx     # Error handling
+│   │   ├── contexts/            # React contexts
+│   │   │   └── AuthContext.jsx  # Authentication context
+│   │   ├── services/            # API services
+│   │   │   └── api.js           # API client
+│   │   ├── features/            # Feature-specific utilities
+│   │   │   └── flags/
+│   │   │       └── utils/       # Flag utilities
+│   │   │           ├── convertToFlagdFormat.js     # UI to flagd format
+│   │   │           ├── convertFromFlagdFormat.js   # flagd to UI format
+│   │   │           └── validateFlagdSchema.js      # Schema validation
+│   │   └── config.js            # Application configuration
 │   ├── package.json
+│   ├── Dockerfile                 # Docker configuration for UI
+│   ├── run-ui.sh                  # Script to run UI locally
 │   └── README.md                 # UI documentation
-├── run-api.sh                   # Script to run API locally
-├── run-ui.sh                    # Script to run UI locally
-├── Dockerfile                   # Docker configuration
 └── README.md                    # This file
+```
+
+## S3 Deployment
+
+The UI can be deployed to AWS S3 for static hosting with runtime API configuration.
+
+### Configuration
+
+The UI uses `config.json` to set the API endpoint at runtime. This allows you to:
+- Deploy the same build to multiple environments
+- Update API URL without rebuilding
+- Manage configuration separately from code
+
+### Setup
+
+1. **Create environment-specific config files:**
+
+   `config.production.json`:
+   ```json
+   {
+     "apiBaseUrl": "https://api.production.com"
+   }
+   ```
+
+   `config.staging.json`:
+   ```json
+   {
+     "apiBaseUrl": "https://api.staging.com"
+   }
+   ```
+
+2. **Build the UI:**
+   ```bash
+   cd ui
+   npm run build
+   ```
+
+3. **Deploy to S3:**
+
+   **Production:**
+   ```bash
+   aws s3 cp dist/ s3://your-production-bucket/ --recursive
+   aws s3 cp config.production.json s3://your-production-bucket/config.json --content-type application/json
+   aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+   ```
+
+   **Staging:**
+   ```bash
+   aws s3 cp dist/ s3://your-staging-bucket/ --recursive
+   aws s3 cp config.staging.json s3://your-staging-bucket/config.json --content-type application/json
+   aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
+   ```
+
+### Updating API URL
+
+To change the API URL without redeploying:
+
+```bash
+aws s3 cp config.production.json s3://your-production-bucket/config.json --content-type application/json
+aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/config.json"
+```
+
+### Local Development
+
+For local development, the UI uses `config.json` with the local API URL:
+
+```bash
+npm run dev
+```
+
+Or override at runtime by editing `config.json`:
+
+```json
+{
+  "apiBaseUrl": "http://localhost:9090"
+}
 ```
 
 ## Testing
