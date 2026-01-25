@@ -55,41 +55,6 @@ function FlagEditPage() {
     }
   }, [sourceId])
 
-  const fetchFlag = useCallback(async () => {
-    try {
-      const response = await get(`/api/v1/sources/${sourceId}/flags/${flagId}`)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      let flagData
-      try {
-        flagData = await response.json()
-      } catch {
-        flagData = null
-      }
-      loadFlagData(flagData)
-    } catch (err) {
-      console.error("Error fetching flag:", err)
-      setSaveResult({ success: false, message: "Error loading flag: " + err.message })
-    } finally {
-      setLoading(false)
-    }
-  }, [sourceId, flagId])
-
-  useEffect(() => {
-    const loadData = async () => {
-      if (sourceId) {
-        await fetchSource()
-      }
-      if (flagId && flagId !== "new") {
-        await fetchFlag()
-      } else {
-        setLoading(false)
-      }
-    }
-    loadData()
-  }, [sourceId, flagId, fetchSource, fetchFlag])  
-
   const loadFlagData = useCallback((flagData) => {
     if (!flagData) {
       // Handle case where flagData is null or undefined
@@ -254,6 +219,41 @@ function FlagEditPage() {
     setHasDefaultRule(hasDefaultRule)
     setDefaultRule(defaultRule)
   }, [flagId])
+
+  const fetchFlag = useCallback(async () => {
+    try {
+      const response = await get(`/api/v1/sources/${sourceId}/flags/${flagId}`)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      let flagData
+      try {
+        flagData = await response.json()
+      } catch {
+        flagData = null
+      }
+      loadFlagData(flagData)
+    } catch (err) {
+      console.error("Error fetching flag:", err)
+      setSaveResult({ success: false, message: "Error loading flag: " + err.message })
+    } finally {
+      setLoading(false)
+    }
+  }, [sourceId, flagId, loadFlagData])
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (sourceId) {
+        await fetchSource()
+      }
+      if (flagId && flagId !== "new") {
+        await fetchFlag()
+      } else {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [sourceId, flagId, fetchSource, fetchFlag])
 
   const generateJSON = useCallback(() => {
     const json = {
@@ -541,7 +541,7 @@ function FlagEditPage() {
   const defaultRuleCheckbox = hasTargeting && (
     <label className="checkbox-wrapper">
       <input id="defaultRule" className="checkbox" type="checkbox" checked={hasDefaultRule}
-        onClick={(e) => setHasDefaultRule(e.target.checked)} />
+        onChange={(e) => setHasDefaultRule(e.target.checked)} />
       <span>Default Rule</span>
     </label>
   )

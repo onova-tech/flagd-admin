@@ -1,4 +1,4 @@
-package tech.onova.flagd_admin_server.controller.DTOs;
+package tech.onova.flagd_admin_server.controller.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import java.util.Map;

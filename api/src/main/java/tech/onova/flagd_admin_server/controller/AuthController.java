@@ -8,9 +8,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import tech.onova.flagd_admin_server.controller.DTOs.LoginRequestDTO;
-import tech.onova.flagd_admin_server.controller.DTOs.LoginResponseDTO;
-import tech.onova.flagd_admin_server.controller.DTOs.RefreshTokenRequestDTO;
+import tech.onova.flagd_admin_server.controller.dto.auth.LoginRequestDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.LoginResponseDTO;
+import tech.onova.flagd_admin_server.controller.dto.request.RefreshTokenRequestDTO;
 import tech.onova.flagd_admin_server.security.jwt.JwtUtil;
 import tech.onova.flagd_admin_server.security.jwt.RefreshTokenService;
 

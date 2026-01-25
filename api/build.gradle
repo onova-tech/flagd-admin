@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'tech.onova'
-version = '0.0.1-SNAPSHOT'
+version = '0.1.0'
 description = 'flagd-admin-server'
 
 java {
@@ -49,6 +49,32 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.80
+            }
+        }
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+tasks.named("jacocoTestReport") {
+    dependsOn test
 }

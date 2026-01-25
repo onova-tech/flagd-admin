@@ -17,7 +17,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-public class SecurityConfig {
+public class SecurityConfiguration {
     private static final String DEFAULT_AUTH_PROVIDER = "jwt";
     private final AuthProvider authProvider;
 
@@ -25,8 +25,8 @@ public class SecurityConfig {
     private String redirectUri;
 
     @Autowired
-    public SecurityConfig(List<AuthProvider> authProviders,
-                          @Value("${application.auth.provider}") String authProviderName) {
+    public SecurityConfiguration(List<AuthProvider> authProviders,
+                                 @Value("${application.auth.provider}") String authProviderName) {
         this.authProvider = authProviders.stream()
                 .filter(provider -> provider.getName().equalsIgnoreCase(authProviderName))
                 .filter(provider -> provider.getName().equalsIgnoreCase(DEFAULT_AUTH_PROVIDER))

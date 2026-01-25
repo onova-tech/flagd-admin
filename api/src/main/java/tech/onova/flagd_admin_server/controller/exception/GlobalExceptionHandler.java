@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
-import tech.onova.flagd_admin_server.controller.DTOs.ErrorResponseDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.ErrorResponseDTO;
 import tech.onova.flagd_admin_server.domain.exception.AuthenticationException;
 import tech.onova.flagd_admin_server.domain.exception.DomainException;
 

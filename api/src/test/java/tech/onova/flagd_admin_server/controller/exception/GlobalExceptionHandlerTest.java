@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import tech.onova.flagd_admin_server.controller.DTOs.ErrorResponseDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.ErrorResponseDTO;
 import tech.onova.flagd_admin_server.domain.exception.ContentValidationException;
 import tech.onova.flagd_admin_server.domain.exception.DomainException;
 import tech.onova.flagd_admin_server.domain.exception.SourceContentAccessException;

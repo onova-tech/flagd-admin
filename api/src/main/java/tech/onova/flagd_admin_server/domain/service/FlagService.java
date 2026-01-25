@@ -1,7 +1,7 @@
 package tech.onova.flagd_admin_server.domain.service;
 
-import tech.onova.flagd_admin_server.controller.DTOs.FlagConfigRequestDTO;
-import tech.onova.flagd_admin_server.controller.DTOs.FlagDTO;
+import tech.onova.flagd_admin_server.controller.dto.request.FlagConfigRequestDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.FlagDTO;
 import tech.onova.flagd_admin_server.domain.entity.SourceId;
 import tech.onova.flagd_admin_server.infrastructure.annotation.Log;
 import java.util.List;

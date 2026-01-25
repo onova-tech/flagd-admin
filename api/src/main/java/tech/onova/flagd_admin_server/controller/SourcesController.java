@@ -5,13 +5,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import tech.onova.flagd_admin_server.controller.DTOs.*;
+import tech.onova.flagd_admin_server.controller.dto.request.SourcePatchRequestDTO;
+import tech.onova.flagd_admin_server.controller.dto.request.SourcePostRequestDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.SourceContentResponseDTO;
+import tech.onova.flagd_admin_server.controller.dto.response.SourceResponseDTO;
+import tech.onova.flagd_admin_server.controller.mapper.SourceMapper;
 import tech.onova.flagd_admin_server.domain.entity.Source;
 import tech.onova.flagd_admin_server.domain.entity.SourceId;
 import tech.onova.flagd_admin_server.domain.entity.SourceUri;
 import tech.onova.flagd_admin_server.domain.repository.SourceRepository;
 import tech.onova.flagd_admin_server.domain.service.SourceContentService;
-import tech.onova.flagd_admin_server.domain.service.FlagService;
 import tech.onova.flagd_admin_server.infrastructure.annotation.Log;
 import tech.onova.flagd_admin_server.security.AuthenticationUtil;
 
@@ -23,61 +26,40 @@ import java.util.UUID;
 public class SourcesController {
     private final SourceRepository sourceRepository;
     private final SourceContentService sourceContentService;
-    private final FlagService flagService;
+    private final SourceMapper sourceMapper;
 
     @Autowired
-    public SourcesController(SourceRepository sourceRepository, SourceContentService sourceContentService, FlagService flagService){
+    public SourcesController(SourceRepository sourceRepository, 
+                         SourceContentService sourceContentService,
+                         SourceMapper sourceMapper) {
         this.sourceRepository = sourceRepository;
         this.sourceContentService = sourceContentService;
-        this.flagService = flagService;
+        this.sourceMapper = sourceMapper;
     }
 
     @GetMapping("/sources")
     @Log
-    public List<SourceResponseDTO> getSources(@RequestParam(defaultValue = "true") boolean isEnabled){
+    public List<SourceResponseDTO> getSources(@RequestParam(defaultValue = "true") boolean isEnabled) {
         return sourceRepository.findByEnabled(isEnabled).stream()
-                .map(source -> new SourceResponseDTO(
-                        source.getId().id(),
-                        source.getName(),
-                        source.getDescription(),
-                        source.getUri().uri(),
-                        source.isEnabled(),
-                        source.getCreationDateTime(),
-                        source.getLastUpdateDateTime(),
-                        source.getLastUpdateUserName()
-                ))
+                .map(sourceMapper::toResponseDTO)
                 .toList();
     }
 
     @GetMapping("/sources/{sourceId}")
     @Log
-    public ResponseEntity<SourceResponseDTO> getSource(@PathVariable UUID sourceId){
+    public ResponseEntity<SourceResponseDTO> getSource(@PathVariable UUID sourceId) {
         var sourceOption = sourceRepository.findById(new SourceId(sourceId));
 
-        if(sourceOption.isEmpty())
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-
-        var source = sourceOption.get();
-
-        return new ResponseEntity<>(
-                new SourceResponseDTO(
-                        source.getId().id(),
-                        source.getName(),
-                        source.getDescription(),
-                        source.getUri().uri(),
-                        source.isEnabled(),
-                        source.getCreationDateTime(),
-                        source.getLastUpdateDateTime(),
-                        source.getLastUpdateUserName()
-                ),
+        return sourceOption.map(source -> new ResponseEntity<>(
+                sourceMapper.toResponseDTO(source),
                 HttpStatus.OK
-        );
+        )).orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     @PatchMapping("/sources/{sourceId}")
     @Log
     public ResponseEntity<SourceResponseDTO> patchSource(@PathVariable UUID sourceId,
-                                                         @Valid @RequestBody SourcePatchRequestDTO request){
+                                                     @Valid @RequestBody SourcePatchRequestDTO request) {
         var sourcePatch = new Source(
                 request.name(),
                 request.description(),
@@ -88,30 +70,21 @@ public class SourcesController {
 
         var sourceOption = sourceRepository.findById(new SourceId(sourceId));
 
-        if(sourceOption.isEmpty())
+        if (sourceOption.isEmpty())
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
         var source = sourceOption.get().update(sourcePatch);
         sourceRepository.save(source);
 
         return new ResponseEntity<>(
-                new SourceResponseDTO(
-                        source.getId().id(),
-                        source.getName(),
-                        source.getDescription(),
-                        source.getUri().uri(),
-                        source.isEnabled(),
-                        source.getCreationDateTime(),
-                        source.getLastUpdateDateTime(),
-                        source.getLastUpdateUserName()
-                ),
+                sourceMapper.toResponseDTO(source),
                 HttpStatus.OK
         );
     }
 
     @PostMapping("/sources")
     @Log
-    public ResponseEntity<SourceResponseDTO> addSource(@Valid @RequestBody SourcePostRequestDTO request){
+    public ResponseEntity<SourceResponseDTO> addSource(@Valid @RequestBody SourcePostRequestDTO request) {
         var source = new Source(
                 request.name(),
                 request.description(),
@@ -123,16 +96,8 @@ public class SourcesController {
         sourceRepository.save(source);
 
         return new ResponseEntity<>(
-                 new SourceResponseDTO(
-                          source.getId().id(),
-                          source.getName(),
-                          source.getDescription(),
-                          source.getUri().uri(),
-                          source.isEnabled(),
-                          source.getCreationDateTime(),
-                          source.getLastUpdateDateTime(),
-                          source.getLastUpdateUserName()),
-                  HttpStatus.CREATED);
+                sourceMapper.toResponseDTO(source),
+                HttpStatus.CREATED);
     }
 
     @DeleteMapping("/sources/{sourceId}")
@@ -164,39 +129,5 @@ public class SourcesController {
                 new SourceContentResponseDTO(content),
                 HttpStatus.OK
         );
-    }
-
-    @GetMapping("/sources/{sourceId}/flags")
-    @Log
-    public ResponseEntity<FlagsResponseDTO> getFlags(@PathVariable UUID sourceId){
-        List<FlagDTO> flags = flagService.getFlags(new SourceId(sourceId));
-        return new ResponseEntity<>(new FlagsResponseDTO(flags), HttpStatus.OK);
-    }
-
-    @GetMapping("/sources/{sourceId}/flags/{flagId}")
-    @Log
-    public ResponseEntity<FlagDTO> getFlag(@PathVariable UUID sourceId, @PathVariable String flagId){
-        FlagDTO flag = flagService.getFlag(new SourceId(sourceId), flagId);
-        if (flag == null) {
-            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-        }
-        return new ResponseEntity<>(flag, HttpStatus.OK);
-    }
-
-    @PostMapping("/sources/{sourceId}/flags/{flagId}")
-    @Log
-    public ResponseEntity<FlagDTO> addOrUpdateFlag(@PathVariable UUID sourceId,
-                                             @PathVariable String flagId,
-                                             @Valid @RequestBody FlagConfigRequestDTO request){
-        flagService.addOrUpdateFlag(new SourceId(sourceId), flagId, request);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-    }
-
-    @DeleteMapping("/sources/{sourceId}/flags/{flagId}")
-    @Log
-    public ResponseEntity<Void> deleteFlag(@PathVariable UUID sourceId,
-                                      @PathVariable String flagId){
-        flagService.deleteFlag(new SourceId(sourceId), flagId);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

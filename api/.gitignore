@@ -24,6 +24,12 @@ gradle-app.setting
 *.war
 *.ear
 
+# Test Files #
+/app.db
+/*.json
+*.log
+
+
 # Avoid updating app.db
 /src/main/resources/app.db
 
