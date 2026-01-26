@@ -542,7 +542,7 @@ cd api
 ./gradlew bootRun
 ```
 
-The server will start on `http://localhost:9090`
+The server will start on `http://localhost:9090` (direct access) or `http://localhost:8080/api/` (via unified container)
 
 ### Running with Custom Configuration
 
@@ -560,8 +560,29 @@ export FLAGD_JWT_SECRET="$(./scripts/generate-jwt-secret.sh | tail -1)"
 
 ### Docker Deployment
 
+#### Option 1: Unified Container (Recommended)
+
+For most deployments, use the unified container that includes both API and UI:
+
 ```bash
-# Build Docker image
+# Build unified image from project root
+cd ..
+docker build -t flagd-admin .
+
+# Run unified container (API accessible via nginx on port 8080)
+docker run -d -p 8080:8080 \
+  -e FLAGD_JWT_SECRET="$(./api/scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./api/scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin flagd-admin
+```
+
+#### Option 2: API-Only Container
+
+For API-only deployments (requires separate UI deployment):
+
+```bash
+# Build API-only image
 docker build -t flagd-admin-api .
 
 # Run with auto-generation (development)

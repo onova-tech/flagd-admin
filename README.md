@@ -14,9 +14,19 @@ Flagd Admin simplifies the management of feature flags by providing:
 
 ## Architecture
 
-The project consists of two main components:
+The project offers two deployment architectures:
 
-### API Server
+### Unified Architecture (Recommended)
+A single container deployment that includes both services:
+- **Supervisor Process Manager**: Orchestrates both API and UI services
+- **Nginx Reverse Proxy**: Serves the UI on port 8080 and proxies API requests
+- **Internal Communication**: UI communicates with API via nginx proxy, no CORS required
+- **Single Entry Point**: Everything accessible through `http://localhost:8080`
+
+### Separated Architecture
+Two independent services (original design):
+
+#### API Server
 A Spring Boot REST API (`/api`) that provides:
 - CRUD operations for feature flag sources
 - Flag management endpoints
@@ -24,7 +34,7 @@ A Spring Boot REST API (`/api`) that provides:
 - SQLite database for persistence
 - JWT-based authentication with login/logout functionality
 
-### User Interface
+#### User Interface
 A React-based web application (`/ui`) that provides:
 - Source management interface
 - Flag editor with real-time preview
@@ -60,6 +70,29 @@ The UI will be available at `http://localhost:5173`
 
 #### Run with Docker
 
+**Option 1: Single Container Image (Recommended)**
+
+The unified Docker image includes both API and UI services running behind nginx:
+
+```bash
+# Build the unified image
+docker build -t flagd-admin .
+
+# Run with auto-generation (development)
+docker run -d -p 8080:8080 --name flagd-admin flagd-admin
+
+# Run with explicit configuration (production)
+docker run -d -p 8080:8080 \
+  -e FLAGD_JWT_SECRET="$(./api/scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./api/scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin flagd-admin
+```
+
+The unified application will be available at `http://localhost:8080`
+
+**Option 2: Separate Container Images**
+
 **API Server:**
 ```bash
 docker run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
@@ -80,8 +113,32 @@ docker run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 > docker run -d -p 5173:80 -v $(pwd)/config.json:/usr/share/nginx/html/config.json --name flagd-admin-ui flagd-admin-ui
 > ```
 
+#### Run with Podman
+
+**Option 1: Single Container Image (Recommended)**
+
+```bash
+# Build unified image
+podman build --format docker -t flagd-admin .
+
+# Run with auto-generation (development)
+podman run -d -p 8080:8080 --name flagd-admin flagd-admin
+
+# Run with explicit configuration (production)
+podman run -d -p 8080:8080 \
+  -e FLAGD_JWT_SECRET="$(./api/scripts/generate-jwt-secret.sh | tail -1)" \
+  -e FLAGD_ADMIN_USERNAME="myadmin" \
+  -e FLAGD_ADMIN_PASSWORD_HASH="$(./api/scripts/generate-password-hash.sh mysecretpass)" \
+  --name flagd-admin flagd-admin
+```
+
+**Option 2: Separate Container Images**
+
 **API Server:**
 ```bash
+# Build api image
+podman build --format docker -t flagd-admin-api .
+
 # Development with auto-generation
 podman run -d -p 9090:9090 --name flagd-admin-api flagd-admin-api
 
@@ -95,12 +152,33 @@ podman run -d -p 9090:9090 \
 
 **UI Application:**
 ```bash
+# Build ui image
+podman build --format docker -t flagd-admin-ui .
+
+# Run ui image
 podman run -d -p 5173:80 --name flagd-admin-ui flagd-admin-ui
 ```
 
-The UI will be available at `http://localhost:5173`
+The unified application will be available at `http://localhost:8080`
+The separate UI application will be available at `http://localhost:5173`
 
 #### Stop and remove containers
+
+**Unified Container:**
+
+**Docker:**
+```bash
+docker stop flagd-admin
+docker rm flagd-admin
+```
+
+**Podman:**
+```bash
+podman stop flagd-admin
+podman rm flagd-admin
+```
+
+**Separate Containers:**
 
 **Docker:**
 ```bash
@@ -115,6 +193,20 @@ podman rm flagd-admin-api flagd-admin-ui
 ```
 
 #### View logs
+
+**Unified Container:**
+
+**Docker:**
+```bash
+docker logs flagd-admin
+```
+
+**Podman:**
+```bash
+podman logs flagd-admin
+```
+
+**Separate Containers:**
 
 **Docker:**
 ```bash
@@ -323,7 +415,8 @@ flagd-admin/
 │   │   │       └── application.properties
 │   │   └── test/
 │   ├── build.gradle               # Gradle build configuration
-│   ├── Dockerfile                 # Docker configuration for API
+│   ├── Dockerfile                 # Docker configuration for API (separate deployment)
+│   ├── entrypoint.sh             # API container entrypoint script
 │   ├── run-api.sh                 # Script to run API locally
 │   └── README.md                  # API documentation
 ├── ui/                           # React UI application
@@ -354,9 +447,16 @@ flagd-admin/
 │   │   │           └── validateFlagdSchema.js      # Schema validation
 │   │   └── config.js            # Application configuration
 │   ├── package.json
-│   ├── Dockerfile                 # Docker configuration for UI
-│   ├── run-ui.sh                  # Script to run UI locally
-│   └── README.md                 # UI documentation
+│   ├── config.json              # Runtime API configuration
+│   ├── Dockerfile               # Docker configuration for UI (separate deployment)
+│   ├── nginx.conf               # Nginx configuration for UI
+│   ├── run-ui.sh                # Script to run UI locally
+│   └── README.md                # UI documentation
+├── docker/                      # Unified deployment configuration
+│   ├── supervisord.conf          # Supervisord process manager configuration
+│   ├── nginx.conf               # Nginx configuration for unified deployment
+│   └── entrypoint.sh            # Unified container entrypoint script
+├── Dockerfile                   # Unified Docker configuration (recommended)
 └── README.md                    # This file
 ```
 

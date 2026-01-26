@@ -71,7 +71,7 @@ ui/
 
 - Node.js 20+
 - npm or yarn
-- Flagd Admin Server API (running on http://localhost:9090 by default)
+- Flagd Admin Server API (running on http://localhost:9090 by default, or via unified container on http://localhost:8080)
 
 ### Installation
 
@@ -86,7 +86,7 @@ npm install
 # Start the development server
 npm run dev
 
-# The app will be available at http://localhost:5173
+# The app will be available at http://localhost:5173 (development) or http://localhost:8080 (unified container)
 ```
 
 ### Build for Production
@@ -163,10 +163,17 @@ View the generated flagd JSON configuration in real-time. Use the "Validate" but
 
 The UI communicates with the Flagd Admin Server API:
 
+### Unified Container Deployment
+- **Base URL**: `""` (relative to nginx proxy)
+- **Authentication**: POST `/api/v1/auth/login`, POST `/api/v1/auth/refresh`
+- **Sources**: GET `/api/v1/sources`, POST `/api/v1/sources`, PATCH `/api/v1/sources/{id}`, GET `/api/v1/sources/{id}/contents`
+- **Flags**: GET `/api/v1/sources/{id}/flags`, GET `/api/v1/sources/{id}/flags/{flagId}`, POST `/api/v1/sources/{id}/flags/{flagId}`, DELETE `/api/v1/sources/{id}/flags/{flagId}`
+
+### Separate Container Deployment
 - **Base URL**: `http://localhost:9090/api/v1`
-- **Authentication**: POST `/auth/login`, POST `/auth/refresh`
-- **Sources**: GET `/sources`, POST `/sources`, PATCH `/sources/{id}`, GET `/sources/{id}/contents`
-- **Flags**: GET `/sources/{id}/flags`, GET `/sources/{id}/flags/{flagId}`, POST `/sources/{id}/flags/{flagId}`, DELETE `/sources/{id}/flags/{flagId}`
+- **Authentication**: POST `/api/v1/auth/login`, POST `/api/v1/auth/refresh`
+- **Sources**: GET `/api/v1/sources`, POST `/api/v1/sources`, PATCH `/api/v1/sources/{id}`, GET `/api/v1/sources/{id}/contents`
+- **Flags**: GET `/api/v1/sources/{id}/flags`, GET `/api/v1/sources/{id}/flags/{flagId}`, POST `/api/v1/sources/{id}/flags/{flagId}`, DELETE `/api/v1/sources/{id}/flags/{flagId}`
 
 **Authentication Flow**:
 1. User logs in via `/auth/login` with username/password
