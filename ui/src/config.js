@@ -2,7 +2,7 @@ export const getApiBaseUrl = async () => {
   try {
     const response = await fetch('/config.json')
     const config = await response.json()
-    return config.apiBaseUrl || 'http://localhost:9090'
+    return config.apiBaseUrl || ''
   } catch (error) {
     console.warn('Failed to load config.json, using default:', error)
     return 'http://localhost:9090'
