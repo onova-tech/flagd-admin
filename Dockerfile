@@ -21,10 +21,6 @@ RUN npm ci
 COPY ui/ ./
 RUN npm run build
 
-# Sets UI config for unified deploy
-RUN rm ./config.json
-RUN echo '{"apiBaseUrl": ""}' > ./config.json
-
 # Stage 3: Runtime with supervisord
 FROM docker.io/eclipse-temurin:21-jre-alpine
 
@@ -61,6 +57,9 @@ ENV FLAGD_ADMIN_PASSWORD_HASH=""
 ENV FLAGD_AUTH_PROVIDER="jwt"
 ENV FLAGD_ACCESS_TOKEN_EXPIRATION="900000"
 ENV FLAGD_REFRESH_TOKEN_EXPIRATION="604800000"
+
+# Set unified config with empty apiBaseUrl for nginx proxy
+RUN echo '{"apiBaseUrl": ""}' > /usr/share/nginx/html/config.json
 
 # Volumes
 VOLUME ["/app"]
