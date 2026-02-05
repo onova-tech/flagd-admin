@@ -130,15 +130,21 @@ version = '0.1.1'
 #### Version Update Commands
 
 ```bash
-# Update API version
+# Update API version (handles multi-digit versions like 0.10.11)
 sed -i "s/version = '[0-9]\+\.[0-9]\+\.[0-9]\+'/version = '0.1.1'/" api/build.gradle
 
-# Update UI version
+# Update UI version (handles multi-digit versions like 0.10.11)
 sed -i 's/"version": "[0-9]\+\.[0-9]\+\.[0-9]\+"/"version": "0.1.1"/' ui/package.json
 
-# Update Docker references
+# Update Docker references (handles multi-digit versions like 0.10.11)
 sed -i 's/flagd_admin_server-[0-9]\+\.[0-9]\+\.[0-9]\+/flagd_admin_server-0.1.1/g' Dockerfile
 sed -i 's/flagd_admin_server-[0-9]\+\.[0-9]\+\.[0-9]\+/flagd_admin_server-0.1.1/g' api/Dockerfile
+
+# Alternative: More robust pattern using regex lookbehind for complex versions
+sed -E -i "s/version = '[0-9]+\.[0-9]+\.[0-9]+'/version = '0.1.1'/" api/build.gradle
+sed -E -i 's/"version": "[0-9]+\.[0-9]+\.[0-9]+"/"version": "0.1.1"/' ui/package.json
+sed -E -i 's/flagd_admin_server-[0-9]+\.[0-9]+\.[0-9]+/flagd_admin_server-0.1.1/g' Dockerfile
+sed -E -i 's/flagd_admin_server-[0-9]+\.[0-9]+\.[0-9]+/flagd_admin_server-0.1.1/g' api/Dockerfile
 ```
 
 ### Step 4: Code Changes & Testing
