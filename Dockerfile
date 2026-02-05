@@ -36,7 +36,7 @@ RUN apk add --no-cache \
 RUN mkdir -p /var/log/supervisor
 
 # Copy built artifacts
-COPY --from=api-builder /build/build/libs/flagd_admin_server-0.1.0.jar /app/api.jar
+COPY --from=api-builder /build/build/libs/flagd_admin_server-0.1.1.jar /app/api.jar
 COPY --from=ui-builder  /build/dist /usr/share/nginx/html
 
 # Copy configuration files

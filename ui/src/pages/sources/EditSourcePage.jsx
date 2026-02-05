@@ -45,7 +45,6 @@ function EditSourcePage() {
     const requestBody = {
       name,
       description: description || "",
-      uri,
       enabled: true
     }
 
@@ -173,10 +172,13 @@ function EditSourcePage() {
                   className="input"
                   placeholder="file:///path/to/flags.json"
                   value={uri}
-                  onChange={(e) => setUri(e.target.value)}
-                  required
-                  disabled={loading}
+                  readOnly
+                  disabled={true}
+                  style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
                 />
+                <small style={{ color: '#666', fontSize: '0.875em', marginTop: '4px', display: 'block' }}>
+                  Note: The source URI cannot be modified. To change the URI, delete this source and create a new one.
+                </small>
               </div>
             </div>
             {error && (
@@ -186,7 +188,7 @@ function EditSourcePage() {
               <button
                 type="submit"
                 className="button button-primary"
-                disabled={loading || !name.trim() || !uri.trim()}
+                disabled={loading || !name.trim()}
               >
                 {loading ? 'Updating...' : 'Update Source'}
               </button>

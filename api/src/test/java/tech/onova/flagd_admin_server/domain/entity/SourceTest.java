@@ -89,7 +89,7 @@ class SourceTest {
     }
 
     @Test
-    void shouldUpdateSourceWithNewData() {
+    void shouldUpdateSourceWithoutChangingUri() {
         // Given
         Source originalSource = TestDataBuilder.aSource()
             .withName("Original Name")
@@ -98,21 +98,19 @@ class SourceTest {
             .withEnabled(true)
             .build();
 
-        Source updateData = new Source(
-            "Updated Name",
-            "Updated Description", 
-            new SourceUri("file://updated/path"),
-            "update-user",
-            false
-        );
-
         // When
-        Source updatedSource = originalSource.update(updateData);
+        Source updatedSource = originalSource.updateWithoutUri(
+            "Updated Name",
+            "Updated Description",
+            false,
+            "update-user"
+        );
 
         // Then
         assertThat(updatedSource.getName()).isEqualTo("Updated Name");
         assertThat(updatedSource.getDescription()).isEqualTo("Updated Description");
-        assertThat(updatedSource.getUri().uri()).isEqualTo("file://updated/path");
+        // URI should remain unchanged - this is the key security feature
+        assertThat(updatedSource.getUri().uri()).isEqualTo("file://original/path");
         assertThat(updatedSource.isEnabled()).isEqualTo(false);
         assertThat(updatedSource.getLastUpdateUserName()).isEqualTo("update-user");
         
