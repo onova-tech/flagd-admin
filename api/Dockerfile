@@ -14,7 +14,7 @@ FROM docker.io/eclipse-temurin:21-jre-alpine
 # Install required utilities
 RUN apk add --no-cache curl python3 py3-bcrypt
 
-COPY --from=builder /build/build/libs/flagd_admin_server-0.0.1-SNAPSHOT.jar /app/api.jar
+COPY --from=builder /build/build/libs/flagd_admin_server-0.1.1.jar /app/api.jar
 COPY entrypoint.sh /usr/local/bin/
 
 # Create database file

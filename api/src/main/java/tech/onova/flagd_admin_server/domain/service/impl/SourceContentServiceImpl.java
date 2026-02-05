@@ -81,7 +81,11 @@ public class SourceContentServiceImpl implements SourceContentService {
             currentContent = contentLoader.loadContent(sourceUri);
         } catch (SourceContentNotFoundException ignored) { }
 
-        if (currentContent == null) {
+        if (currentContent != null) {
+            // Validate existing content to ensure it's a valid flagd configuration file
+            contentValidator.validateContent(currentContent);
+        } else {
+            // File doesn't exist, create with default valid content
             contentLoader.initializeContent(sourceUri, null);
         }
     }

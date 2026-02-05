@@ -49,6 +49,20 @@ public class Source {
         return this;
     }
 
+    public Source updateWithoutUri(String name, String description, boolean enabled, String userName) {
+        Assert.hasText(name, "source name must not be empty");
+        Assert.hasText(description, "source description must not be empty");
+        Assert.hasText(userName, "last update user must not be empty");
+
+        this.name = name;
+        this.description = description;
+        this.enabled = enabled;
+        this.lastUpdateDateTime = ZonedDateTime.now();
+        this.lastUpdateUserName = userName;
+
+        return this;
+    }
+
     public SourceId getId() {
         return id;
     }

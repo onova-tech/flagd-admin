@@ -6,7 +6,7 @@ plugins {
 }
 
 group = 'tech.onova'
-version = '0.1.0'
+version = '0.1.1'
 description = 'flagd-admin-server'
 
 java {

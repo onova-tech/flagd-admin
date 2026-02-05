@@ -60,20 +60,17 @@ public class SourcesController {
     @Log
     public ResponseEntity<SourceResponseDTO> patchSource(@PathVariable UUID sourceId,
                                                      @Valid @RequestBody SourcePatchRequestDTO request) {
-        var sourcePatch = new Source(
-                request.name(),
-                request.description(),
-                new SourceUri(request.uri()),
-                AuthenticationUtil.getCurrentUsername(),
-                request.enabled()
-        );
-
         var sourceOption = sourceRepository.findById(new SourceId(sourceId));
 
         if (sourceOption.isEmpty())
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
 
-        var source = sourceOption.get().update(sourcePatch);
+        var source = sourceOption.get().updateWithoutUri(
+                request.name(),
+                request.description(),
+                request.enabled(),
+                AuthenticationUtil.getCurrentUsername()
+        );
         sourceRepository.save(source);
 
         return new ResponseEntity<>(
