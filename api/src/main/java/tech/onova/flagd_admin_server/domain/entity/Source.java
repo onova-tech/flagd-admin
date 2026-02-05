@@ -38,16 +38,7 @@ public class Source {
         this.lastUpdateUserName = userName;
     }
 
-    public Source update(Source source) {
-        this.name = source.getName();
-        this.description = source.getDescription();
-        this.uri = source.getUri();
-        this.enabled = source.isEnabled();
-        this.lastUpdateDateTime = ZonedDateTime.now();
-        this.lastUpdateUserName = source.getLastUpdateUserName();
-
-        return this;
-    }
+    
 
     public Source updateWithoutUri(String name, String description, boolean enabled, String userName) {
         Assert.hasText(name, "source name must not be empty");
