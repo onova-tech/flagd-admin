@@ -84,6 +84,7 @@ apt-get install -y \
     apt-transport-https \
     docker.io \
     docker-compose-plugin \
+    nginx \
     certbot \
     python3-certbot-nginx \
     python3
@@ -118,8 +119,7 @@ services:
     container_name: flagd-admin
     restart: unless-stopped
     ports:
-      - "80:8080"
-      - "443:8443"
+      - "127.0.0.1:8081:8080"
     environment:
       - FLAGD_JWT_SECRET=$JWT_SECRET
       - FLAGD_ADMIN_USERNAME=$ADMIN_USERNAME
@@ -128,30 +128,118 @@ services:
       - SERVER_NAME=$SERVER_NAME
     volumes:
       - app_data:/app
-      - ./certbot/conf:/etc/letsencrypt:ro
-
-  certbot:
-    image: certbot/certbot:latest
-    container_name: flagd-certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - /var/run/docker.sock:/var/run/docker.sock
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do \\
-      docker compose -f /home/ubuntu/flagd-admin/docker-compose.yml stop app 2>/dev/null || true; \\
-      sleep 5; \\
-      certbot renew --standalone -d $SERVER_NAME; \\
-      sleep 5; \\
-      docker compose -f /home/ubuntu/flagd-admin/docker-compose.yml start app 2>/dev/null || true; \\
-      sleep 12h & wait \$${!}; done;'"
-    network_mode: host
+    network_mode: bridge
 
 volumes:
   app_data:
 EOF
 
-# Note: Nginx configuration removed - using direct deployment with app container
+# Create server nginx configuration for HTTP (redirect to HTTPS)
+echo "Creating nginx HTTP configuration..."
+cat > /home/ubuntu/flagd-admin/nginx-http.conf << 'EOF'
+server {
+    listen 80;
+    server_name _;
+    
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://$host$request_uri;
+}
+EOF
 
-# Note: ACME server removed - using certbot standalone mode instead
+# Create server nginx configuration for HTTPS with proxy to container
+echo "Creating nginx HTTPS configuration..."
+cat > /home/ubuntu/flagd-admin/nginx-https.conf << 'EOF'
+server {
+    listen 443 ssl http2;
+    server_name _;
+    
+    # SSL configuration (will be updated by certbot)
+    ssl_certificate /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/privkey.pem;
+    
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Forwarded-Proto https always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Proxy to the Flagd Admin container
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        
+        # WebSocket support (if needed)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # Timeout settings
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+        
+        # Handle large uploads
+        client_max_body_size 10M;
+    }
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml+rss
+        application/atom+xml
+        image/svg+xml;
+}
+EOF
+
+# Create nginx sites-available configuration
+echo "Setting up nginx sites configuration..."
+cat > /home/ubuntu/flagd-admin/nginx-setup.sh << 'EOF'
+#!/bin/bash
+set -e
+
+echo "Setting up nginx configuration..."
+
+# Backup default nginx configuration
+mv /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.backup 2>/dev/null || true
+
+# Copy our configurations
+cp /home/ubuntu/flagd-admin/nginx-http.conf /etc/nginx/sites-available/flagd-admin-http
+cp /home/ubuntu/flagd-admin/nginx-https.conf /etc/nginx/sites-available/flagd-admin-https
+
+# Create symbolic links
+ln -sf /etc/nginx/sites-available/flagd-admin-http /etc/nginx/sites-enabled/
+# Note: HTTPS config will be enabled after SSL certificate is obtained
+
+# Test nginx configuration
+nginx -t
+
+# Enable and start nginx
+systemctl enable nginx
+systemctl restart nginx
+
+echo "Nginx configuration completed"
+EOF
 
 # Update script
 echo "Creating update.sh..."
@@ -235,83 +323,46 @@ docker build -t flagd-admin:latest .
 # Step 3: Check for port conflicts and start services
 echo "Step 3: Checking for port conflicts..."
 
-# Check port 80
-if lsof -i :80 >/dev/null 2>&1 || ss -tlnp | grep -q ":80 "; then
-    echo "⚠️  Port 80 is already in use. Checking what service is running..."
-    
-    # Check for systemd services
+# Check port 80 (nginx should be running)
+if systemctl is-active --quiet nginx 2>/dev/null; then
+    echo "✅ Nginx is running on port 80 - that's expected!"
+else
+    echo "⚠️  Nginx is not running, starting it..."
+    systemctl start nginx
     if systemctl is-active --quiet nginx 2>/dev/null; then
-        echo "🔄 Stopping nginx service to free port 80..."
-        systemctl stop nginx
-        systemctl disable nginx
-        echo "✅ Nginx service stopped"
-    elif systemctl is-active --quiet apache2 2>/dev/null; then
-        echo "🔄 Stopping apache2 service to free port 80..."
-        systemctl stop apache2
-        systemctl disable apache2
-        echo "✅ Apache2 service stopped"
+        echo "✅ Nginx started successfully"
     else
-        echo "🔍 Checking for Docker containers using port 80..."
-        DOCKER_CONTAINERS=$(docker ps --filter "publish=80" --format "{{.ID}} {{.Names}}" 2>/dev/null)
-        if [ ! -z "$DOCKER_CONTAINERS" ]; then
-            echo "🔄 Stopping Docker containers using port 80..."
-            echo "$DOCKER_CONTAINERS" | while read CONTAINER_ID CONTAINER_NAME; do
-                echo "Stopping container: $CONTAINER_NAME ($CONTAINER_ID)"
-                docker stop "$CONTAINER_ID" 2>/dev/null || true
-            done
-            echo "✅ Docker containers stopped"
-        else
-            echo "❌ Another service is using port 80. Attempting to identify..."
-            echo "Running processes:"
-            ps aux | grep -E "(nginx|apache|httpd)" | grep -v grep || true
-            echo ""
-            echo "Please identify and stop the service manually:"
-            echo "  sudo ss -tulpn | grep :80"
-            echo "  sudo lsof -i :80"
-            echo ""
-            echo "Or you can run this command to stop all services on port 80:"
-            echo "  sudo fuser -k 80/tcp"
-            exit 1
-        fi
+        echo "❌ Failed to start nginx"
+        exit 1
+    fi
+fi
     fi
 fi
 
-# Check port 443
-if lsof -i :443 >/dev/null 2>&1 || ss -tlnp | grep -q ":443 "; then
+# Check port 443 (should be free until SSL is set up)
+if ss -tlnp | grep -q ":443 "; then
     echo "⚠️  Port 443 is already in use. Checking what service is running..."
     
-    DOCKER_CONTAINERS=$(docker ps --filter "publish=443" --format "{{.ID}} {{.Names}}" 2>/dev/null)
-    if [ ! -z "$DOCKER_CONTAINERS" ]; then
-        echo "🔄 Stopping Docker containers using port 443..."
-        echo "$DOCKER_CONTAINERS" | while read CONTAINER_ID CONTAINER_NAME; do
-            echo "Stopping container: $CONTAINER_NAME ($CONTAINER_ID)"
-            docker stop "$CONTAINER_ID" 2>/dev/null || true
-        done
-        echo "✅ Docker containers stopped"
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+        echo "🔄 Restarting nginx to ensure clean state..."
+        systemctl restart nginx
+        echo "✅ Nginx restarted"
     else
         echo "❌ Another service is using port 443. Please check and stop it manually:"
         echo "  sudo ss -tulpn | grep :443"
         echo "  sudo lsof -i :443"
         exit 1
     fi
+else
+    echo "✅ Port 443 is free (expected before SSL setup)"
 fi
 
 # Step 4: Final port check and cleanup
 echo "Step 4: Final port check before starting services..."
 sleep 2
 
-# Force cleanup if ports are still occupied
-if lsof -i :80 >/dev/null 2>&1; then
-    echo "⚠️  Port 80 still in use, forcing cleanup..."
-    fuser -k 80/tcp 2>/dev/null || true
-    sleep 2
-fi
-
-if lsof -i :443 >/dev/null 2>&1; then
-    echo "⚠️  Port 443 still in use, forcing cleanup..."
-    fuser -k 443/tcp 2>/dev/null || true
-    sleep 2
-fi
+# No need for force cleanup - nginx should manage port 80
+echo "✅ Port management handled by nginx"
 
 echo "Step 5: Starting services..."
 docker compose up -d app
@@ -320,35 +371,40 @@ docker compose up -d app
 echo "Step 6: Waiting for services to be ready..."
 sleep 45
 
-# Step 7: Test HTTP access
+# Step 7: Test HTTP access (should redirect to HTTPS setup later)
 echo "Step 7: Testing HTTP access..."
 if curl -f http://localhost:80 > /dev/null 2>&1; then
     echo "✅ HTTP service is working!"
 else
     echo "❌ HTTP service is not working!"
     echo "Debugging information:"
-    echo "1. Container status:"
+    echo "1. Nginx status:"
+    systemctl status nginx --no-pager
+    echo ""
+    echo "2. Container status:"
     docker compose ps
     echo ""
-    echo "2. Container logs:"
+    echo "3. Container logs:"
     docker compose logs app
     echo ""
-    echo "3. Port status:"
-    ss -tulpn | grep -E ":(80|8080)" || echo "No processes found on ports 80/8080"
+    echo "4. Port status:"
+    ss -tulpn | grep -E ":(80|8081)" || echo "No processes found on ports 80/8081"
     echo ""
-    echo "4. Run debug script for more info:"
-    echo "   ./debug-ports.sh"
+    echo "5. Nginx configuration test:"
+    nginx -t
     exit 1
 fi
 
 echo "=== Service Setup Complete ==="
-echo "Application is running on: http://$SERVER_NAME"
+echo "Application is running on: http://$SERVER_NAME (HTTP to HTTPS redirect)"
+echo "Container is running internally on port 8081"
 echo ""
 echo "Next steps:"
 echo "1. Configure Oracle Cloud security rules (see setup-complete.log)"
 echo "2. Ensure DNS A record points to this VM: $(curl -s http://169.254.169.254/opc/v2/instance/metadata | jq -r '.publicIp' 2>/dev/null || echo 'Unable to get IP')"
-echo "3. Wait for DNS propagation, then run: ./setup-ssl.sh to configure HTTPS"
-echo "4. Visit: http://$SERVER_NAME"
+echo "3. Wait for DNS propagation, then run: ./ssl-test.sh to test SSL setup"
+echo "4. Run: ./setup-ssl.sh to configure HTTPS"
+echo "5. Visit: https://$SERVER_NAME (after SSL setup)"
 EOF
 
 # SSL setup script (SEPARATE - to be run manually after DNS propagation)
@@ -381,79 +437,67 @@ fi
 
 echo "✅ DNS resolution working! ($SERVER_NAME → $MY_IP)"
 
-# Step 2: Stop app container temporarily for certbot
-echo "Step 2: Preparing for SSL certificate..."
-docker compose stop app
+# Step 2: Update HTTPS nginx configuration with actual domain
+echo "Step 2: Updating nginx HTTPS configuration..."
+sed "s/DOMAIN_PLACEHOLDER/$SERVER_NAME/g" /home/ubuntu/flagd-admin/nginx-https.conf > /tmp/nginx-https-updated.conf
+mv /tmp/nginx-https-updated.conf /etc/nginx/sites-available/flagd-admin-https
 
-# Step 3: Ensure port 80 is free
-echo "Step 3: Ensuring port 80 is free for certbot..."
-sleep 3
-if lsof -i :80 >/dev/null 2>&1; then
-    echo "Port 80 is still in use, forcing cleanup..."
-    fuser -k 80/tcp 2>/dev/null || true
-    sleep 2
-fi
+# Step 3: Ensure nginx is running on port 80 for certbot challenge
+echo "Step 3: Preparing nginx for certbot..."
+systemctl restart nginx
 
-# Step 4: Obtain SSL certificate using standalone mode
-echo "Step 4: Obtaining SSL certificate using standalone mode..."
-docker run --rm \
-  -v /home/ubuntu/flagd-admin/certbot/conf:/etc/letsencrypt \
-  -p 80:80 \
-  certbot/certbot certonly --standalone \
-  --email $CERTBOT_NOTIFICATION_EMAIL --agree-tos --no-eff-email -d $SERVER_NAME
+# Step 4: Obtain SSL certificate using nginx plugin
+echo "Step 4: Obtaining SSL certificate using certbot nginx plugin..."
+certbot --nginx -d $SERVER_NAME --email $CERTBOT_NOTIFICATION_EMAIL --agree-tos --no-eff-email --non-interactive
 
-# Step 5: Restart app container with SSL
-echo "Step 5: Restarting app container with SSL..."
-docker compose up -d app
+# Step 5: Enable HTTPS site
+echo "Step 5: Enabling HTTPS site..."
+ln -sf /etc/nginx/sites-available/flagd-admin-https /etc/nginx/sites-enabled/
 
-# Step 6: Verify HTTPS setup
-echo "Step 6: Verifying HTTPS setup..."
-sleep 45
+# Step 6: Test and reload nginx
+echo "Step 6: Testing and reloading nginx..."
+nginx -t
+systemctl reload nginx
 
-# Check if SSL certificates are accessible inside container
-echo "Checking SSL certificates..."
-if docker compose exec app test -f "/etc/letsencrypt/live/$SERVER_NAME/fullchain.pem" 2>/dev/null; then
-    echo "✅ SSL certificates found in container"
-else
-    echo "❌ SSL certificates not found in container"
-    echo "Available certificates:"
-    docker compose exec app ls -la /etc/letsencrypt/live/ 2>/dev/null || echo "No certificates directory found"
-    exit 1
-fi
+# Step 7: Verify HTTPS setup
+echo "Step 7: Verifying HTTPS setup..."
+sleep 10
 
 # Test HTTPS
-if curl -k -f https://localhost:443 > /dev/null 2>&1; then
+if curl -f https://localhost:443 > /dev/null 2>&1; then
     echo "✅ HTTPS service is working!"
-elif curl -k -f https://localhost:8443 > /dev/null 2>&1; then
-    echo "✅ HTTPS service is working on container port 8443!"
 else
     echo "❌ HTTPS service is not working!"
     echo "Debugging information:"
-    echo "1. Container status:"
-    docker compose ps
+    echo "1. Nginx status:"
+    systemctl status nginx --no-pager
     echo ""
-    echo "2. SSL certificates in container:"
-    docker compose exec app find /etc/letsencrypt -name "*.pem" 2>/dev/null || echo "No certificates found"
+    echo "2. Nginx configuration test:"
+    nginx -t
     echo ""
-    echo "3. Nginx status and configuration:"
-    docker compose exec app nginx -t 2>/dev/null || echo "Nginx config test failed"
+    echo "3. SSL certificates:"
+    ls -la /etc/letsencrypt/live/$SERVER_NAME/ 2>/dev/null || echo "No certificates found"
     echo ""
-    echo "4. Container logs (last 50 lines):"
-    docker compose logs --tail=50 app
-    echo ""
-    echo "5. Port check inside container:"
-    docker compose exec app netstat -tlnp 2>/dev/null | grep -E ":(8080|8443)" || echo "Ports not found"
+    echo "4. Port status:"
+    ss -tulpn | grep -E ":(80|443)" || echo "No processes found on ports 80/443"
     exit 1
 fi
 
+# Step 8: Setup auto-renewal
+echo "Step 8: Setting up SSL certificate auto-renewal..."
+(crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && /usr/bin/systemctl reload nginx") | crontab -
+
 echo "=== SSL Setup Complete ==="
 echo "🎉 Your Flagd Admin is now available at: https://$SERVER_NAME"
-echo "📋 Certificate auto-renewal is configured"
+echo "📋 Certificate auto-renewal is configured via cron"
 EOF
 
 # Set proper permissions
 echo "Setting permissions..."
 chmod 644 /home/ubuntu/flagd-admin/docker-compose.yml
+chmod 644 /home/ubuntu/flagd-admin/nginx-http.conf
+chmod 644 /home/ubuntu/flagd-admin/nginx-https.conf
+chmod 755 /home/ubuntu/flagd-admin/nginx-setup.sh
 chmod 755 /home/ubuntu/flagd-admin/update.sh
 chmod 755 /home/ubuntu/flagd-admin/backup.sh
 chmod 755 /home/ubuntu/flagd-admin/start-services.sh
@@ -468,6 +512,11 @@ systemctl start docker
 # Add ubuntu user to docker group
 usermod -aG docker ubuntu
 
+# Setup nginx
+echo "Setting up nginx..."
+chmod +x /home/ubuntu/flagd-admin/nginx-setup.sh
+/home/ubuntu/flagd-admin/nginx-setup.sh
+
 # Create SSL test script
 echo "Creating ssl-test.sh..."
 cat > /home/ubuntu/flagd-admin/ssl-test.sh << 'EOF'
@@ -475,35 +524,18 @@ cat > /home/ubuntu/flagd-admin/ssl-test.sh << 'EOF'
 set -e
 
 echo "=== SSL Certificate Test ==="
-echo "This script tests the standalone mode before running setup-ssl.sh"
+echo "This script tests certbot with nginx plugin before running setup-ssl.sh"
 echo "Started at: $(date)"
 
 cd /home/ubuntu/flagd-admin
 
-# Step 1: Stop app container
-echo "Step 1: Stopping app container..."
-docker compose stop app
+# Step 1: Ensure nginx is running on port 80
+echo "Step 1: Ensuring nginx is running..."
+systemctl start nginx
 
-# Step 2: Ensure port 80 is free
-echo "Step 2: Ensuring port 80 is free..."
-sleep 3
-if lsof -i :80 >/dev/null 2>&1; then
-    echo "Port 80 is still in use, forcing cleanup..."
-    fuser -k 80/tcp 2>/dev/null || true
-    sleep 2
-fi
-
-# Step 3: Test certbot dry run
-echo "Step 3: Testing certbot with dry run..."
-docker run --rm \
-  -v /home/ubuntu/flagd-admin/certbot/conf:/etc/letsencrypt \
-  -p 80:80 \
-  certbot/certbot certonly --standalone --dry-run \
-  --email test@example.com --agree-tos --no-eff-email -d $SERVER_NAME
-
-# Step 4: Restart app container
-echo "Step 4: Restarting app container..."
-docker compose start app
+# Step 2: Test certbot dry run with nginx plugin
+echo "Step 2: Testing certbot with dry run..."
+certbot --nginx -d $SERVER_NAME --email test@example.com --agree-tos --no-eff-email --dry-run --non-interactive
 
 echo "=== SSL Test Complete ==="
 echo "✅ Dry run successful! You can now run ./setup-ssl.sh"

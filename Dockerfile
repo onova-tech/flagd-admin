@@ -42,7 +42,6 @@ COPY --from=ui-builder  /build/dist /usr/share/nginx/html
 # Copy configuration files
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-COPY docker/nginx-ssl.conf /etc/nginx/http.d/ssl.conf
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 # Create database file
@@ -65,8 +64,8 @@ RUN echo '{"apiBaseUrl": ""}' > /usr/share/nginx/html/config.json
 # Volumes
 VOLUME ["/app"]
 
-# Expose nginx ports
-EXPOSE 8080 8443
+# Expose nginx port
+EXPOSE 8080
 
 # Health check for nginx (UI accessible)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
