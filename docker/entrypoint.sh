@@ -41,13 +41,31 @@ print(hashed.decode('utf-8'))
     fi
 }
 
+# Function to setup SSL configuration
+setup_ssl_config() {
+    if [ -d "/etc/letsencrypt/live" ] && [ -f "/etc/letsencrypt/live/$(hostname)/fullchain.pem" ]; then
+        DOMAIN=$(basename /etc/letsencrypt/live/* 2>/dev/null | head -1)
+        if [ ! -z "$DOMAIN" ] && [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+            echo "🔒 Setting up SSL configuration for domain: $DOMAIN"
+            sed -i "s/flagd-admin.onova.tech/$DOMAIN/g" /etc/nginx/http.d/ssl.conf
+        else
+            echo "⚠️ SSL certificates not found, using default domain"
+        fi
+    else
+        echo "ℹ️ No SSL certificates found, SSL configuration will be disabled"
+    fi
+}
+
 # Function to start nginx
 start_nginx() {
-    echo "🌐 Starting nginx on port 8080..."
+    echo "🌐 Setting up nginx configuration..."
+    setup_ssl_config
+    
     # Test nginx configuration
     nginx -t
     if [ $? -eq 0 ]; then
         echo "✅ Nginx configuration is valid"
+        echo "🌐 Starting nginx on ports 8080 (HTTP) and 8443 (HTTPS)..."
     else
         echo "❌ Nginx configuration is invalid"
         exit 1
