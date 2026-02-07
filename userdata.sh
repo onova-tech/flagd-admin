@@ -84,6 +84,7 @@ apt-get install -y \
     apt-transport-https \
     docker.io \
     docker-compose-plugin \
+    iptables-persistent \
     nginx \
     certbot \
     python3-certbot-nginx \
@@ -183,6 +184,7 @@ EOF
 iptables -I INPUT -p tcp --dport 80 -j ACCEPT
 iptables -I INPUT -p tcp --dport 443 -j ACCEPT
 iptables-save
+netfilter-persistent save
 
 # Enable nginx site
 echo "Enabling nginx site..."
